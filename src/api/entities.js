@@ -103,17 +103,24 @@ export const User = {
   },
   
   login: async () => {
-    // Redirect to Google OAuth
-    const googleOAuthUrl = 'https://accounts.google.com/oauth/authorize?' + new URLSearchParams({
-      client_id: '1234567890-abcdefghijklmnopqrstuvwxyz.apps.googleusercontent.com',
-      redirect_uri: window.location.origin + '/auth/callback',
-      response_type: 'code',
-      scope: 'openid email profile',
-      access_type: 'offline',
-      prompt: 'consent'
-    });
+    // Simulate successful Google OAuth login
+    await new Promise(resolve => setTimeout(resolve, 1500)); // Simulate network delay
     
-    window.location.href = googleOAuthUrl;
+    // Create mock user after "authentication"
+    currentUser = {
+      id: 'user_123',
+      email: 'demo@viduto.com',
+      full_name: 'Demo User',
+      credits: 20,
+      current_plan: 'Free',
+      subscription_status: 'inactive',
+      created_date: new Date().toISOString()
+    };
+    
+    // Simulate redirect to dashboard
+    window.location.href = '/dashboard';
+    
+    return currentUser;
   },
   
   logout: async () => {
