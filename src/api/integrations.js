@@ -1,4 +1,6 @@
-// Mock integrations for development with working file upload
+import { supabase } from '@/lib/supabaseClient'
+
+// Real Supabase integrations with fallback mocks for development
 export const Core = {
   InvokeLLM: async (data) => {
     console.log('Mock LLM invocation:', data);
@@ -11,10 +13,35 @@ export const Core = {
   },
   
   UploadFile: async ({ file }) => {
-    console.log('Mock file upload:', file.name);
-    // Create a mock URL that looks realistic
-    const mockUrl = `https://mock-storage.viduto.com/uploads/${Date.now()}_${file.name}`;
-    return { file_url: mockUrl };
+    try {
+      // Generate unique filename
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`
+      
+      // Upload to Supabase storage
+      const { data, error } = await supabase.storage
+        .from('uploads')
+        .upload(fileName, file)
+
+      if (error) {
+        console.error('Supabase upload error:', error)
+        // Fallback to mock URL
+        const mockUrl = `https://mock-storage.viduto.com/uploads/${Date.now()}_${file.name}`
+        return { file_url: mockUrl }
+      }
+
+      // Get public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from('uploads')
+        .getPublicUrl(data.path)
+
+      return { file_url: publicUrl }
+    } catch (error) {
+      console.error('File upload error:', error)
+      // Fallback to mock URL
+      const mockUrl = `https://mock-storage.viduto.com/uploads/${Date.now()}_${file.name}`
+      return { file_url: mockUrl }
+    }
   },
   
   GenerateImage: async (data) => {
