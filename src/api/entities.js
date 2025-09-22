@@ -103,25 +103,17 @@ export const User = {
   },
   
   login: async () => {
-    // Simulate successful Google login
-    return new Promise((resolve) => {
-      setTimeout(() => {
-        currentUser = {
-          id: 'user_123',
-          email: 'user@example.com',
-          full_name: 'Demo User',
-          credits: 45,
-          current_plan: 'Pro',
-          subscription_status: 'active',
-          subscription_period_end: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
-          created_date: new Date().toISOString()
-        };
-        
-        // Redirect to dashboard after successful login
-        window.location.href = '/dashboard';
-        resolve(currentUser);
-      }, 1000);
+    // Redirect to Google OAuth
+    const googleOAuthUrl = 'https://accounts.google.com/oauth/authorize?' + new URLSearchParams({
+      client_id: '1234567890-abcdefghijklmnopqrstuvwxyz.apps.googleusercontent.com',
+      redirect_uri: window.location.origin + '/auth/callback',
+      response_type: 'code',
+      scope: 'openid email profile',
+      access_type: 'offline',
+      prompt: 'consent'
     });
+    
+    window.location.href = googleOAuthUrl;
   },
   
   logout: async () => {
