@@ -1,10 +1,15 @@
-# Base44 App
+# Viduto App
 
+A modern video creation platform built with React and Vite.
 
-This app was created automatically by Base44.
-It's a Vite+React app that communicates with the Base44 API.
+## Features
 
-## Running the app
+- AI-powered video creation
+- Product showcase videos
+- Text-based video generation
+- Modern, responsive design
+
+## Getting Started
 
 ```bash
 npm install
@@ -17,4 +22,12 @@ npm run dev
 npm run build
 ```
 
-For more information and support, please contact Base44 support at app@base44.com.
+## Tech Stack
+
+- React 18
+- Vite
+- Tailwind CSS
+- React Router
+- Radix UI components
+
+For support, please contact support@viduto.com.
