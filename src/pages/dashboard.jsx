@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { Menu, X, User as UserIcon, CreditCard, LogOut, Plus, MessageSquare, HelpCircle, Sun, Moon, Gift, Zap, Settings } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
@@ -254,7 +253,11 @@ export default function Dashboard() {
            }
         }
       } catch (e) {
-        console.error('Initialization failed:', e);
+        if (e.message === 'Not authenticated') {
+          console.info('User not authenticated, redirecting to home page');
+        } else {
+          console.error('Initialization failed:', e);
+        }
         setAuthError(true);
         setTimeout(() => navigate('/'), 1000);
       } finally {
