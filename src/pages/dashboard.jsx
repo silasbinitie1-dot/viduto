@@ -11,7 +11,6 @@ import { Button } from '@/components/ui/button';
 import { HelpModal } from '../components/HelpModal';
 import { SubscriptionPage } from '../components/SubscriptionPage';
 import { WinCreditsModal } from '../components/WinCreditsModal';
-import { CreditsModal } from '../components/CreditsModal';
 import { toast } from "sonner";
 import Logo from "@/components/Logo";
 import { ensureUserCredits } from '@/api/functions';
