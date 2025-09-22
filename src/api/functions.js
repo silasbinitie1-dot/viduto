@@ -1,55 +1,63 @@
-import { base44 } from './base44Client';
+// Mock functions for development
+export const createStripeCheckoutSession = async (data) => {
+  console.log('Mock Stripe checkout:', data);
+  return { data: { url: 'https://checkout.stripe.com/mock' } };
+};
 
+export const createStripeCustomerPortal = async () => {
+  console.log('Mock customer portal');
+  return { data: { url: 'https://billing.stripe.com/mock' } };
+};
 
-export const createStripeCheckoutSession = base44.functions.createStripeCheckoutSession;
+export const sendFacebookConversionEvent = async (data) => {
+  console.log('Mock Facebook event:', data);
+};
 
-export const createStripeCustomerPortal = base44.functions.createStripeCustomerPortal;
+export const triggerRevisionWorkflow = async (data) => {
+  console.log('Mock revision workflow:', data);
+};
 
-export const stripeWebhook = base44.functions.stripeWebhook;
+export const checkVideoStatus = async (data) => {
+  console.log('Mock video status check:', data);
+};
 
-export const sendFacebookConversionEvent = base44.functions.sendFacebookConversionEvent;
+export const triggerInitialVideoWorkflow = async (data) => {
+  console.log('Mock initial video workflow:', data);
+};
 
-export const triggerRevisionWorkflow = base44.functions.triggerRevisionWorkflow;
+export const startVideoProduction = async (data) => {
+  console.log('Mock video production:', data);
+};
 
-export const checkVideoStatus = base44.functions.checkVideoStatus;
+export const getBlogPosts = async () => {
+  return { data: { posts: [] } };
+};
 
-export const triggerInitialVideoWorkflow = base44.functions.triggerInitialVideoWorkflow;
+export const ensureUserCredits = async () => {
+  console.log('Mock ensure user credits');
+};
 
-export const startVideoProduction = base44.functions.startVideoProduction;
+export const setupNewUser = async () => {
+  console.log('Mock setup new user');
+};
 
-export const n8nVideoCallback = base44.functions.n8nVideoCallback;
+export const syncUserWithStripe = async () => {
+  console.log('Mock sync with Stripe');
+};
 
-export const getBlogPosts = base44.functions.getBlogPosts;
-
-export const generateSitemap = base44.functions.generateSitemap;
-
-export const staticFeatures = base44.functions.staticFeatures;
-
-export const staticPricing = base44.functions.staticPricing;
-
-export const robotsTxt = base44.functions.robotsTxt;
-
-export const staticHome = base44.functions.staticHome;
-
-export const llmSummary = base44.functions.llmSummary;
-
-export const ensureUserCredits = base44.functions.ensureUserCredits;
-
-export const setupNewUser = base44.functions.setupNewUser;
-
-export const syncUserWithStripe = base44.functions.syncUserWithStripe;
-
-export const lockingManager = base44.functions.lockingManager;
-
-export const adminVideoManager = base44.functions.adminVideoManager;
-
-export const n8nVideoUrlCallback = base44.functions.n8nVideoUrlCallback;
-
-export const rateLimiter = base44.functions.rateLimiter;
-
-export const fixMyCredits = base44.functions.fixMyCredits;
-
-export const migrateUsersToSchedules = base44.functions.migrateUsersToSchedules;
-
-export const migrationCron = base44.functions.migrationCron;
-
+// Export all other functions as mocks
+export const stripeWebhook = async () => {};
+export const n8nVideoCallback = async () => {};
+export const generateSitemap = async () => {};
+export const staticFeatures = async () => {};
+export const staticPricing = async () => {};
+export const robotsTxt = async () => {};
+export const staticHome = async () => {};
+export const llmSummary = async () => {};
+export const lockingManager = async () => {};
+export const adminVideoManager = async () => {};
+export const n8nVideoUrlCallback = async () => {};
+export const rateLimiter = async () => {};
+export const fixMyCredits = async () => {};
+export const migrateUsersToSchedules = async () => {};
+export const migrationCron = async () => {};
