@@ -44,7 +44,6 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
         const chat = await Chat.get(chatId);
         setCurrentChat(chat);
 
-        const chatMessages = await Message.filter({ chat_id: chatId }, 'created_date');
         const chatMessages = await Message.filter({ chat_id: chatId }, 'created_at');
         setMessages(chatMessages || []);
       } catch (error) {
