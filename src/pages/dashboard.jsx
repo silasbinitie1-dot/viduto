@@ -200,7 +200,7 @@ export default function Dashboard() {
           throw new Error('Failed to authenticate after multiple attempts');
         }
 
-        const currentUser = await User.me();
+        currentUser = await User.me();
         setUser(currentUser);
         setUserCredits(currentUser.credits || 0);
         setAuthError(false);
