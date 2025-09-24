@@ -160,13 +160,19 @@ export const User = {
   },
 
   login: async () => {
+    console.log('User.login - Starting OAuth flow...');
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/dashboard`
+        redirectTo: `${window.location.origin}/dashboard`,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent'
+        }
       }
     })
 
+    console.log('User.login - OAuth response:', { data, error });
     if (error) throw error
     return data
   },

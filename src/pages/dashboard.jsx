@@ -156,44 +156,57 @@ export default function Dashboard() {
     const initialize = async () => {
       setLoading(true);
       try {
-        await syncUserWithStripe();
+        // Wait for auth session to be ready
+        console.log('Dashboard - Waiting for auth session...');
+        
+        // Check if we're in the middle of an OAuth flow
+        const urlParams = new URLSearchParams(window.location.search);
+        const hasAuthParams = urlParams.has('access_token') || urlParams.has('code');
+        
+        if (hasAuthParams) {
+          console.log('Dashboard - OAuth parameters detected, waiting for session...');
+          // Give extra time for OAuth flow to complete
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
 
-        // --- START: Added retry logic for Supabase session ---
-        let authUser = null;
+        // Try to get current user with retries
+        let currentUser = null;
         let attempts = 0;
-        const maxAttempts = 5;
-        const delayMs = 1000; // 1 second delay between attempts
-
-        while (!authUser && attempts < maxAttempts) {
-            console.log(`Dashboard - Attempting to get user session, attempt ${attempts + 1}`);
-            const { data: { user }, error: authError } = await supabase.auth.getUser();
-            if (user) {
-                authUser = user;
-                console.log('Dashboard - Supabase session found:', authUser.id);
-                break;
-            } else if (authError) {
-                console.error('Dashboard - Supabase auth.getUser error:', authError.message);
-                // If there's a definitive error from getUser, we should stop and throw
-                throw new Error('Not authenticated');
+        const maxAttempts = 10;
+        
+        while (!currentUser && attempts < maxAttempts) {
+          attempts++;
+          console.log(`Dashboard - Attempt ${attempts}/${maxAttempts} to get user`);
+          
+          try {
+            currentUser = await User.me();
+            console.log('Dashboard - User.me() successful:', currentUser.email);
+            break;
+          } catch (error) {
+            console.log(`Dashboard - User.me() failed on attempt ${attempts}:`, error.message);
+            
+            if (error.message === 'Not authenticated' && attempts < maxAttempts) {
+              // Wait before retrying
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              continue;
             }
-            attempts++;
-            if (attempts < maxAttempts) {
-                await new Promise(resolve => setTimeout(resolve, delayMs));
-            }
+            
+            // If it's not an auth error or we've exhausted retries, throw
+            throw error;
+          }
+        }
+        
+        if (!currentUser) {
+          throw new Error('Failed to authenticate after multiple attempts');
         }
 
-        if (!authUser) {
-            console.error('Dashboard - Failed to retrieve Supabase session after multiple attempts.');
-            throw new Error('Not authenticated');
-        }
-        // --- END: Added retry logic for Supabase session ---
-
-        // Now that we are sure authUser exists, proceed with User.me()
-        // User.me() will use this session to fetch/create the user profile in the 'users' table.
         const currentUser = await User.me();
         setUser(currentUser);
         setUserCredits(currentUser.credits || 0);
         setAuthError(false);
+        
+        console.log('Dashboard - Authentication successful, syncing with Stripe...');
+        await syncUserWithStripe();
 
         // This ensures new users or users with 0 credits get their initial credits if applicable
         if (currentUser.credits == null || currentUser.credits === 0) {

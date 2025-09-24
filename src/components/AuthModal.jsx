@@ -19,8 +19,10 @@ export const AuthModal = ({ isOpen, onClose }) => {
                 window.fbq('track', 'InitiateCheckout');
             }
             
+            console.log('AuthModal - Starting Google OAuth login...');
             // Use the Base44 Google OAuth login method
-            await User.login();
+            const result = await User.login();
+            console.log('AuthModal - OAuth login initiated:', result);
         } catch (error) {
             console.error('Google login failed:', error);
             toast.error('Login failed. Please try again.');
