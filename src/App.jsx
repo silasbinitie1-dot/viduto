@@ -10,6 +10,9 @@ function App() {
     // Listen for auth state changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('App.jsx - Auth state change event:', event);
+        console.log('App.jsx - Auth state change session:', session);
+        
         if (event === 'SIGNED_IN') {
           console.log('User signed in:', session?.user?.email)
           // Redirect will be handled by the OAuth flow

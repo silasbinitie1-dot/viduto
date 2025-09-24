@@ -114,8 +114,10 @@ export const SystemLog = {}
 export const User = {
   me: async () => {
     const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
+    console.log('User.me - supabase.auth.getUser result:', { authUser, authError });
     
     if (authError || !authUser) {
+      console.log('User.me - Not authenticated, throwing error.');
       throw new Error('Not authenticated')
     }
 
@@ -126,9 +128,11 @@ export const User = {
       .eq('id', authUser.id)
       .single()
 
+    console.log('User.me - user profile fetch result:', { userProfile, profileError });
     if (profileError) {
       // If user doesn't exist in users table, create them
       if (profileError.code === 'PGRST116') {
+        console.log('User.me - Profile not found, creating new user.');
         const { data: newUser, error: createError } = await supabase
           .from('users')
           .insert({
@@ -143,11 +147,15 @@ export const User = {
           .single()
 
         if (createError) throw createError
+          console.error('User.me - Error creating new user profile:', createError);
+        console.log('User.me - New user profile created:', newUser);
         return newUser
       }
+      console.error('User.me - Profile fetch error:', profileError);
       throw profileError
     }
 
+    console.log('User.me - Existing user profile found:', userProfile);
     return userProfile
   },
 

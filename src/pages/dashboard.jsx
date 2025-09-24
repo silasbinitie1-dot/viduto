@@ -15,6 +15,7 @@ import Logo from "@/components/Logo";
 import { ensureUserCredits } from '@/api/functions';
 import { createStripeCustomerPortal } from '@/api/functions';
 import { syncUserWithStripe } from '@/api/functions';
+import { supabase } from '@/lib/supabaseClient';
 
 export default function Dashboard() {
   const [user, setUser] = useState(null);
@@ -157,6 +158,38 @@ export default function Dashboard() {
       try {
         await syncUserWithStripe();
 
+        // --- START: Added retry logic for Supabase session ---
+        let authUser = null;
+        let attempts = 0;
+        const maxAttempts = 5;
+        const delayMs = 1000; // 1 second delay between attempts
+
+        while (!authUser && attempts < maxAttempts) {
+            console.log(`Dashboard - Attempting to get user session, attempt ${attempts + 1}`);
+            const { data: { user }, error: authError } = await supabase.auth.getUser();
+            if (user) {
+                authUser = user;
+                console.log('Dashboard - Supabase session found:', authUser.id);
+                break;
+            } else if (authError) {
+                console.error('Dashboard - Supabase auth.getUser error:', authError.message);
+                // If there's a definitive error from getUser, we should stop and throw
+                throw new Error('Not authenticated');
+            }
+            attempts++;
+            if (attempts < maxAttempts) {
+                await new Promise(resolve => setTimeout(resolve, delayMs));
+            }
+        }
+
+        if (!authUser) {
+            console.error('Dashboard - Failed to retrieve Supabase session after multiple attempts.');
+            throw new Error('Not authenticated');
+        }
+        // --- END: Added retry logic for Supabase session ---
+
+        // Now that we are sure authUser exists, proceed with User.me()
+        // User.me() will use this session to fetch/create the user profile in the 'users' table.
         const currentUser = await User.me();
         setUser(currentUser);
         setUserCredits(currentUser.credits || 0);

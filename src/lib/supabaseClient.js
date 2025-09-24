@@ -14,3 +14,12 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: true
   }
 })
+
+// Add session debugging
+supabase.auth.onAuthStateChange((event, session) => {
+  console.log('Supabase Client - Auth state change:', { event, session: session ? 'Session exists' : 'No session' });
+  if (session) {
+    console.log('Supabase Client - User ID:', session.user?.id);
+    console.log('Supabase Client - User email:', session.user?.email);
+  }
+})
