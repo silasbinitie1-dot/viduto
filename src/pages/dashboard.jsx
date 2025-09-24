@@ -295,6 +295,7 @@ export default function Dashboard() {
               }
            }
         }
+        }
       } catch (e) {
         if (e.message === 'Not authenticated') {
           console.info('User not authenticated, redirecting to home page');
