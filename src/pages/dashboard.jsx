@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { HelpModal } from '../components/HelpModal';
 import { SubscriptionPage } from '../components/SubscriptionPage';
 import { WinCreditsModal } from '../components/WinCreditsModal';
+import { CreditsModal } from '../components/CreditsModal';
 import { toast } from "sonner";
 import Logo from "@/components/Logo";
 import { ensureUserCredits } from '@/api/functions';
@@ -215,6 +216,7 @@ export default function Dashboard() {
 
         if (window.fbq) {
           window.fbq('track', 'CompleteRegistration');
+        }
         
         const view = urlParams.get('view');
         if (view === 'pricing') {
@@ -295,7 +297,6 @@ export default function Dashboard() {
               }
            }
         }
-        }
       } catch (e) {
         if (e.message === 'Not authenticated') {
           console.info('User not authenticated, redirecting to home page');
@@ -365,7 +366,7 @@ export default function Dashboard() {
           setCurrentChatId(userChats[0].id);
         }
     } catch(e) {
-        console.error("Failed to update chats", e)
+        console.error("Failed to update chats", e);
     }
   }, [currentChatId]);
 
