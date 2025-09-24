@@ -2,9 +2,22 @@ import { supabase } from '@/lib/supabase'
 
 export const Chat = {
   create: async (data) => {
+    // Get current user to ensure user_id is set
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    
+    if (authError || !user) {
+      throw new Error('Not authenticated')
+    }
+
+    // Ensure user_id is included in the data
+    const chatData = {
+      ...data,
+      user_id: user.id
+    }
+
     const { data: result, error } = await supabase
       .from('chat')
-      .insert(data)
+      .insert(chatData)
       .select()
       .single()
     
@@ -55,6 +68,13 @@ export const Chat = {
 
 export const Message = {
   create: async (data) => {
+    // Get current user for validation
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    
+    if (authError || !user) {
+      throw new Error('Not authenticated')
+    }
+
     const { data: result, error } = await supabase
       .from('message')
       .insert(data)
