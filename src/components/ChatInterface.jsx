@@ -78,6 +78,9 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
     setGeneratingBrief(true);
     
     try {
+      // Check if user has enough credits for brief generation (free)
+      // Brief generation is free, but we still want to verify user state
+      
       // Find the initial user message
       const initialMessage = chatMessages.find(msg => 
         msg.message_type === 'user' && msg.metadata?.is_initial_request
@@ -90,36 +93,15 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
       const userPrompt = initialMessage.content;
       const imageUrl = initialMessage.metadata?.image_url;
 
-      // Create comprehensive LLM prompt for brief generation
-      const llmPrompt = `You are an elite video creative director specializing in viral product marketing videos. Your task is to create a detailed video brief for a 30-second product showcase video.
-
-USER REQUEST: "${userPrompt}"
-PRODUCT IMAGE: ${imageUrl || 'No image provided'}
-
-Create a comprehensive video brief that includes:
-
-1. **Video Concept**: A clear, engaging concept that will capture attention in the first 3 seconds
-2. **Scene Breakdown**: 3-4 distinct scenes with specific timing (total 30 seconds)
-3. **Voiceover Script**: Natural, conversational script that highlights key benefits
-4. **Visual Style**: Mood, color palette, and aesthetic direction
-5. **Music Direction**: Specific music style and energy level
-6. **Call to Action**: Clear, compelling CTA for the end
-
-Format your response as a structured brief that the user can easily review and approve. Make it professional but accessible.
-
-Focus on creating content that:
-- Hooks viewers in the first 3 seconds
-- Showcases the product authentically
-- Drives engagement and conversions
-- Feels native to social media platforms
-
-Be specific and actionable in your recommendations.`;
+      if (!imageUrl) {
+        throw new Error('Product image is required for brief generation');
+      }
 
       // Call LLM to generate brief
       const llmResponse = await InvokeLLM({
-        prompt: llmPrompt,
+        prompt: userPrompt,
         image_url: imageUrl,
-        max_tokens: 1000
+        max_tokens: 2000
       });
 
       const generatedBrief = llmResponse.response;
@@ -198,6 +180,19 @@ Be specific and actionable in your recommendations.`;
 
   // Handle brief approval and start production
   const handleApproveBrief = async () => {
+    // Check if user has enough credits before starting production
+    try {
+      const currentUser = await User.me();
+      if (!currentUser || currentUser.credits < 10) {
+        toast.error('Insufficient credits. You need 10 credits to start video production.');
+        return;
+      }
+    } catch (error) {
+      console.error('Error checking user credits:', error);
+      toast.error('Failed to verify credits. Please try again.');
+      return;
+    }
+
     try {
       setLoading(true);
 
