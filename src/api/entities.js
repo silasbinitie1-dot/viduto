@@ -160,23 +160,13 @@ export const User = {
   },
 
   login: async () => {
-    const response = await fetch('/api/auth/login', {
-      method: 'POST',
-      credentials: 'include'
-    });
+    // For Base44, we need to redirect directly to the OAuth endpoint
+    // This should be configured in your Base44 project settings
+    const baseUrl = window.location.origin;
+    const redirectUrl = `${baseUrl}/dashboard`;
     
-    if (!response.ok) {
-      throw new Error(`Login failed: ${response.statusText}`);
-    }
-    
-    const data = await response.json();
-    
-    // Redirect to Google OAuth
-    if (data.redirect_url) {
-      window.location.href = data.redirect_url;
-    }
-    
-    return data;
+    // Redirect to Base44 Google OAuth
+    window.location.href = `/api/auth/google?redirect_url=${encodeURIComponent(redirectUrl)}`;
   },
 
   logout: async () => {

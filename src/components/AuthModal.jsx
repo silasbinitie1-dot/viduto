@@ -20,9 +20,13 @@ export const AuthModal = ({ isOpen, onClose }) => {
             }
             
             console.log('AuthModal - Starting Google OAuth login...');
-            // Use the Base44 Google OAuth login method
-            const result = await User.login();
-            console.log('AuthModal - OAuth login initiated:', result);
+            
+            // For Base44, redirect directly to OAuth endpoint
+            const baseUrl = window.location.origin;
+            const redirectUrl = `${baseUrl}/dashboard`;
+            
+            // Redirect to Base44 Google OAuth
+            window.location.href = `/api/auth/google?redirect_url=${encodeURIComponent(redirectUrl)}`;
         } catch (error) {
             console.error('Google login failed:', error);
             toast.error('Login failed. Please try again.');
