@@ -178,7 +178,7 @@ export default function Home() {
 
         const newChat = await Chat.create({
           title: 'Creating brief...',
-          status: 'draft',
+          status: 'active',
           workflow_state: 'draft'
         });
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Send, Upload, X, Plus, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Chat, Message, Video } from '@/api/entities';
+import { Chat, Message } from '@/api/entities';
 import { UploadFile } from '@/api/integrations';
 import { VideoPlayer } from './VideoPlayer';
 import ProductionProgress from './ProductionProgress';
@@ -45,6 +45,7 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
         setCurrentChat(chat);
 
         const chatMessages = await Message.filter({ chat_id: chatId }, 'created_date');
+        const chatMessages = await Message.filter({ chat_id: chatId }, 'created_at');
         setMessages(chatMessages || []);
       } catch (error) {
         console.error('Error loading chat:', error);
@@ -103,9 +104,9 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
       // Create new chat if none exists
       if (!currentChatId) {
         chat = await Chat.create({
-          title: newMessage.trim() || 'New Video Project',
+          title: newMessage.trim() || 'Creating brief...',
           status: 'active',
-          workflow_state: 'active'
+          workflow_state: 'draft'
         });
         currentChatId = chat.id;
         setCurrentChat(chat);

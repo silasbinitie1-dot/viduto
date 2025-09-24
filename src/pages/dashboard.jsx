@@ -1,9 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Menu, X, User as UserIcon, CreditCard, LogOut, Plus, MessageSquare, HelpCircle, Sun, Moon, Gift, Zap, Settings } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { User } from '@/api/entities';
-import { Chat } from '@/api/entities';
-import { Message } from '@/api/entities';
+import { User, Chat, Message } from '@/api/entities';
 import { UploadFile } from '@/api/integrations';
 import { ChatInterface } from '../components/ChatInterface';
 import { Button } from '@/components/ui/button';
@@ -16,7 +14,6 @@ import Logo from "@/components/Logo";
 import { ensureUserCredits } from '@/api/functions';
 import { createStripeCustomerPortal } from '@/api/functions';
 import { syncUserWithStripe } from '@/api/functions';
-import { supabase } from '@/lib/supabaseClient';
 
 export default function Dashboard() {
   const [user, setUser] = useState(null);
@@ -157,51 +154,11 @@ export default function Dashboard() {
     const initialize = async () => {
       setLoading(true);
       try {
-        // Wait for auth session to be ready
-        console.log('Dashboard - Waiting for auth session...');
+        console.log('Dashboard - Initializing...');
         
-        // Check if we're in the middle of an OAuth flow
-        const urlParams = new URLSearchParams(window.location.search);
-        const hasAuthParams = urlParams.has('access_token') || urlParams.has('code');
+        const currentUser = await User.me();
+        console.log('Dashboard - User authenticated:', currentUser.email);
         
-        if (hasAuthParams) {
-          console.log('Dashboard - OAuth parameters detected, waiting for session...');
-          // Give extra time for OAuth flow to complete
-          await new Promise(resolve => setTimeout(resolve, 2000));
-        }
-
-        // Try to get current user with retries
-        let currentUser = null;
-        let attempts = 0;
-        const maxAttempts = 10;
-        
-        while (!currentUser && attempts < maxAttempts) {
-          attempts++;
-          console.log(`Dashboard - Attempt ${attempts}/${maxAttempts} to get user`);
-          
-          try {
-            currentUser = await User.me();
-            console.log('Dashboard - User.me() successful:', currentUser.email);
-            break;
-          } catch (error) {
-            console.log(`Dashboard - User.me() failed on attempt ${attempts}:`, error.message);
-            
-            if (error.message === 'Not authenticated' && attempts < maxAttempts) {
-              // Wait before retrying
-              await new Promise(resolve => setTimeout(resolve, 1000));
-              continue;
-            }
-            
-            // If it's not an auth error or we've exhausted retries, throw
-            throw error;
-          }
-        }
-        
-        if (!currentUser) {
-          throw new Error('Failed to authenticate after multiple attempts');
-        }
-
-        currentUser = await User.me();
         setUser(currentUser);
         setUserCredits(currentUser.credits || 0);
         setAuthError(false);
@@ -218,6 +175,7 @@ export default function Dashboard() {
           window.fbq('track', 'CompleteRegistration');
         }
         
+        const urlParams = new URLSearchParams(window.location.search);
         const view = urlParams.get('view');
         if (view === 'pricing') {
           setActiveDashboardView('pricing');
@@ -255,7 +213,7 @@ export default function Dashboard() {
         const chatIdFromUrl = urlParams.get('chat');
 
         if (chatIdFromUrl) {
-          const userChats = await Chat.filter({ created_by: currentUser.email }, '-updated_date');
+          const userChats = await Chat.filter({}, '-updated_at');
           setChats(userChats || []);
           setCurrentChatId(chatIdFromUrl);
           window.history.replaceState({}, '', '/dashboard');
@@ -285,12 +243,12 @@ export default function Dashboard() {
                 metadata: { image_url: file_url, is_initial_request: true }
               });
 
-              const userChats = await Chat.filter({ created_by: currentUser.email }, '-updated_date');
+              const userChats = await Chat.filter({}, '-updated_at');
               setChats(userChats || []);
               setCurrentChatId(newChat.id);
               
            } else {
-              const userChats = await Chat.filter({ created_by: currentUser.email }, '-updated_date');
+              const userChats = await Chat.filter({}, '-updated_at');
               setChats(userChats || []);
               if (userChats && userChats.length > 0) {
                 setCurrentChatId(userChats[0].id);
@@ -358,7 +316,7 @@ export default function Dashboard() {
   const handleChatUpdate = useCallback(async (newChatId = null) => {
     try {
         const currentUser = await User.me();
-        const userChats = await Chat.filter({ created_by: currentUser.email }, '-updated_date');
+        const userChats = await Chat.filter({}, '-updated_at');
         setChats(userChats || []);
         if (newChatId && currentChatId === null) {
           setCurrentChatId(newChatId);

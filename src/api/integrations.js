@@ -1,70 +1,116 @@
-import { supabase } from '@/lib/supabaseClient'
-
-// Real Supabase integrations with fallback mocks for development
+// Base44 Core Integrations - properly structured
 export const Core = {
   InvokeLLM: async (data) => {
-    console.log('Mock LLM invocation:', data);
-    return { result: 'Mock AI response: I understand your request and will create a professional video.' };
+    const response = await fetch('/api/integrations/invoke-llm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+      credentials: 'include'
+    });
+    
+    if (!response.ok) {
+      throw new Error(`LLM invocation failed: ${response.statusText}`);
+    }
+    
+    return response.json();
   },
   
   SendEmail: async (data) => {
-    console.log('Mock email send:', data);
-    return { success: true };
+    const response = await fetch('/api/integrations/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+      credentials: 'include'
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Email send failed: ${response.statusText}`);
+    }
+    
+    return response.json();
   },
   
   UploadFile: async ({ file }) => {
-    try {
-      // Generate unique filename
-      const fileExt = file.name.split('.').pop()
-      const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`
-      
-      // Upload to Supabase storage
-      const { data, error } = await supabase.storage
-        .from('uploads')
-        .upload(fileName, file)
-
-      if (error) {
-        console.error('Supabase upload error:', error)
-        // Fallback to mock URL
-        const mockUrl = `https://mock-storage.viduto.com/uploads/${Date.now()}_${file.name}`
-        return { file_url: mockUrl }
-      }
-
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('uploads')
-        .getPublicUrl(data.path)
-
-      return { file_url: publicUrl }
-    } catch (error) {
-      console.error('File upload error:', error)
-      // Fallback to mock URL
-      const mockUrl = `https://mock-storage.viduto.com/uploads/${Date.now()}_${file.name}`
-      return { file_url: mockUrl }
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const response = await fetch('/api/integrations/upload-file', {
+      method: 'POST',
+      body: formData,
+      credentials: 'include'
+    });
+    
+    if (!response.ok) {
+      throw new Error(`File upload failed: ${response.statusText}`);
     }
+    
+    return response.json();
   },
   
   GenerateImage: async (data) => {
-    console.log('Mock image generation:', data);
-    return { image_url: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=400' };
+    const response = await fetch('/api/integrations/generate-image', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+      credentials: 'include'
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Image generation failed: ${response.statusText}`);
+    }
+    
+    return response.json();
   },
   
   ExtractDataFromUploadedFile: async (data) => {
-    console.log('Mock data extraction:', data);
-    return { extracted_data: { text: 'Mock extracted text', metadata: {} } };
+    const response = await fetch('/api/integrations/extract-data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+      credentials: 'include'
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Data extraction failed: ${response.statusText}`);
+    }
+    
+    return response.json();
   },
   
   CreateFileSignedUrl: async (data) => {
-    console.log('Mock signed URL creation:', data);
-    return { signed_url: 'https://mock-storage.viduto.com/signed-url' };
+    const response = await fetch('/api/integrations/create-signed-url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+      credentials: 'include'
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Signed URL creation failed: ${response.statusText}`);
+    }
+    
+    return response.json();
   },
   
   UploadPrivateFile: async (data) => {
-    console.log('Mock private file upload:', data);
-    return { file_url: 'https://mock-storage.viduto.com/private/file' };
+    const formData = new FormData();
+    formData.append('file', data.file);
+    
+    const response = await fetch('/api/integrations/upload-private-file', {
+      method: 'POST',
+      body: formData,
+      credentials: 'include'
+    });
+    
+    if (!response.ok) {
+      throw new Error(`Private file upload failed: ${response.statusText}`);
+    }
+    
+    return response.json();
   }
 };
 
+// Export individual functions for convenience
 export const InvokeLLM = Core.InvokeLLM;
 export const SendEmail = Core.SendEmail;
 export const UploadFile = Core.UploadFile;

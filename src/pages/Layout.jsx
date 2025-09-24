@@ -2,7 +2,6 @@
 
 import React, { useEffect } from 'react';
 import { Toaster } from "@/components/ui/sonner";
-import { toast } from "sonner";
 
 export default function Layout({ children, currentPageName }) {
   useEffect(() => {
@@ -66,7 +65,7 @@ export default function Layout({ children, currentPageName }) {
       for (const f of files) {
         if (!isImageFile(f)) continue; // Only process actual image files
         if (!isAllowedImage(f)) {
-          toast.error("Only JPG or PNG images are allowed.");
+          console.error("Only JPG or PNG images are allowed.");
           target.value = ""; // Clear the input value to prevent submission of invalid files
           e.preventDefault();
           e.stopPropagation();
@@ -88,7 +87,7 @@ export default function Layout({ children, currentPageName }) {
         for (const f of dt.files) {
           if (!isImageFile(f)) continue; // Only process actual image files
           if (!isAllowedImage(f)) {
-            toast.error("Only JPG or PNG images are allowed.");
+            console.error("Only JPG or PNG images are allowed.");
             e.preventDefault(); // Prevent file from being dropped
             e.stopPropagation();
             return;
