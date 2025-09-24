@@ -663,7 +663,7 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
             )}
 
             <div className="flex gap-2">
-              <div className="flex-1 relative">
+              <div className="flex-1">
                 <textarea
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
@@ -678,7 +678,7 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
                 />
               </div>
               
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-2 items-end">
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -688,25 +688,27 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
                 />
                 
                 <Button
-                  type="button"
+                  type="button" 
                   onClick={() => {
                     if (!newMessage.trim()) {
                       toast.error('Please enter a description for your video');
                       return;
                     }
                     if (!selectedFile) {
-                      toast.error('Please upload a product image');
+                      fileInputRef.current?.click();
                       return;
                     }
-                    // Create a proper form event
-                    const form = document.createElement('form');
-                    const submitEvent = new Event('submit', { bubbles: true, cancelable: true });
-                    form.dispatchEvent(submitEvent);
-                    handleSubmit(submitEvent);
+                    handleSubmit(new Event('submit'));
                   }}
                   size="icon"
                   disabled={isSubmitting || generatingBrief}
-                  className="w-10 h-10 bg-orange-500 text-white hover:bg-orange-600"
+                  className={`w-10 h-10 ${
+                    !newMessage.trim() 
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+                      : !selectedFile 
+                        ? 'bg-blue-500 text-white hover:bg-blue-600' 
+                        : 'bg-orange-500 text-white hover:bg-orange-600'
+                  }`}
                 >
                   {isSubmitting ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
@@ -717,16 +719,6 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
                   ) : (
                     <Send className="w-4 h-4" />
                   )}
-                </Button>
-                
-                <Button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  size="icon"
-                  variant="outline"
-                  className={`w-10 h-10 ${darkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : ''}`}
-                >
-                  <Upload className="w-4 h-4" />
                 </Button>
               </div>
             </div>
