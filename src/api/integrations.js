@@ -227,23 +227,14 @@ Voiceover: [Exactly 15 words - verified word count]
   },
   
   UploadFile: async ({ file }) => {
-    const fileExt = file.name.split('.').pop()
-    const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`
-    const filePath = `uploads/${fileName}`
-
-    const { data, error } = await supabase.storage
-      .from('files')
-      .upload(filePath, file)
-
-    if (error) {
-      throw new Error(`File upload failed: ${error.message}`)
-    }
-
-    const { data: { publicUrl } } = supabase.storage
-      .from('files')
-      .getPublicUrl(filePath)
-
-    return { file_url: publicUrl }
+    // Mock file upload - convert to base64 data URL for demo
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        resolve({ file_url: e.target.result });
+      };
+      reader.readAsDataURL(file);
+    });
   },
   
   GenerateImage: async (data) => {
