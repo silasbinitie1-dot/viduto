@@ -217,8 +217,6 @@ export default function Dashboard() {
           window.fbq('track', 'CompleteRegistration');
         }
         
-        const urlParams = new URLSearchParams(window.location.search);
-        
         const view = urlParams.get('view');
         if (view === 'pricing') {
           setActiveDashboardView('pricing');
