@@ -215,7 +215,6 @@ export default function Dashboard() {
 
         if (window.fbq) {
           window.fbq('track', 'CompleteRegistration');
-        }
         
         const view = urlParams.get('view');
         if (view === 'pricing') {
