@@ -1,120 +1,88 @@
-// Base44 Core Integrations - properly structured
+import { supabase } from '@/lib/supabase'
+
 export const Core = {
   InvokeLLM: async (data) => {
-    const response = await fetch('/api/integrations/invoke-llm', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-      credentials: 'include'
-    });
-    
-    if (!response.ok) {
-      throw new Error(`LLM invocation failed: ${response.statusText}`);
+    // For demo purposes, return a mock response
+    // In production, this would call your LLM service
+    return {
+      response: "This is a mock LLM response. In production, this would call your actual LLM service.",
+      usage: { tokens: 100 }
     }
-    
-    return response.json();
   },
   
   SendEmail: async (data) => {
-    const response = await fetch('/api/integrations/send-email', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-      credentials: 'include'
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Email send failed: ${response.statusText}`);
-    }
-    
-    return response.json();
+    // For demo purposes, log the email
+    console.log('Email would be sent:', data)
+    return { success: true, message: 'Email sent successfully' }
   },
   
   UploadFile: async ({ file }) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    
-    const response = await fetch('/api/integrations/upload-file', {
-      method: 'POST',
-      body: formData,
-      credentials: 'include'
-    });
-    
-    if (!response.ok) {
-      throw new Error(`File upload failed: ${response.statusText}`);
+    const fileExt = file.name.split('.').pop()
+    const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`
+    const filePath = `uploads/${fileName}`
+
+    const { data, error } = await supabase.storage
+      .from('files')
+      .upload(filePath, file)
+
+    if (error) {
+      throw new Error(`File upload failed: ${error.message}`)
     }
-    
-    return response.json();
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('files')
+      .getPublicUrl(filePath)
+
+    return { file_url: publicUrl }
   },
   
   GenerateImage: async (data) => {
-    const response = await fetch('/api/integrations/generate-image', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-      credentials: 'include'
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Image generation failed: ${response.statusText}`);
+    // For demo purposes, return a placeholder
+    return {
+      image_url: "https://images.unsplash.com/photo-1526948128573-703ee1aeb6fa?q=80&w=800&auto=format&fit=crop",
+      success: true
     }
-    
-    return response.json();
   },
   
   ExtractDataFromUploadedFile: async (data) => {
-    const response = await fetch('/api/integrations/extract-data', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-      credentials: 'include'
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Data extraction failed: ${response.statusText}`);
+    // For demo purposes, return mock extracted data
+    return {
+      extracted_data: { text: "Mock extracted text", metadata: {} },
+      success: true
     }
-    
-    return response.json();
   },
   
   CreateFileSignedUrl: async (data) => {
-    const response = await fetch('/api/integrations/create-signed-url', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-      credentials: 'include'
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Signed URL creation failed: ${response.statusText}`);
+    // For demo purposes, return the same URL
+    return {
+      signed_url: data.file_url || "https://example.com/signed-url",
+      expires_in: 3600
     }
-    
-    return response.json();
   },
   
   UploadPrivateFile: async (data) => {
-    const formData = new FormData();
-    formData.append('file', data.file);
-    
-    const response = await fetch('/api/integrations/upload-private-file', {
-      method: 'POST',
-      body: formData,
-      credentials: 'include'
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Private file upload failed: ${response.statusText}`);
+    // Similar to UploadFile but for private storage
+    const fileExt = data.file.name.split('.').pop()
+    const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`
+    const filePath = `private/${fileName}`
+
+    const { data: uploadData, error } = await supabase.storage
+      .from('private-files')
+      .upload(filePath, data.file)
+
+    if (error) {
+      throw new Error(`Private file upload failed: ${error.message}`)
     }
-    
-    return response.json();
+
+    return { file_path: filePath, success: true }
   }
-};
+}
 
 // Export individual functions for convenience
-export const InvokeLLM = Core.InvokeLLM;
-export const SendEmail = Core.SendEmail;
-export const UploadFile = Core.UploadFile;
-export const GenerateImage = Core.GenerateImage;
-export const ExtractDataFromUploadedFile = Core.ExtractDataFromUploadedFile;
-export const CreateFileSignedUrl = Core.CreateFileSignedUrl;
-export const UploadPrivateFile = Core.UploadPrivateFile;
+export const InvokeLLM = Core.InvokeLLM
+export const SendEmail = Core.SendEmail
+export const UploadFile = Core.UploadFile
+export const GenerateImage = Core.GenerateImage
+export const ExtractDataFromUploadedFile = Core.ExtractDataFromUploadedFile
+export const CreateFileSignedUrl = Core.CreateFileSignedUrl
+export const UploadPrivateFile = Core.UploadPrivateFile

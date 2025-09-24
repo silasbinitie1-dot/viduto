@@ -1,240 +1,103 @@
-// Base44 Functions - backend serverless functions
+// Mock functions for demo purposes - in production these would call actual backend services
+
 export const createStripeCheckoutSession = async (data) => {
-  const response = await fetch('/api/functions/create-stripe-checkout-session', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-    credentials: 'include'
-  });
-  
-  if (!response.ok) {
-    throw new Error(`Stripe checkout failed: ${response.statusText}`);
+  // Mock Stripe checkout - in production this would create actual Stripe sessions
+  console.log('Mock Stripe checkout session:', data)
+  return {
+    data: {
+      url: 'https://checkout.stripe.com/mock-session'
+    }
   }
-  
-  return response.json();
-};
+}
 
 export const createStripeCustomerPortal = async () => {
-  const response = await fetch('/api/functions/create-stripe-customer-portal', {
-    method: 'POST',
-    credentials: 'include'
-  });
-  
-  if (!response.ok) {
-    throw new Error(`Customer portal failed: ${response.statusText}`);
+  // Mock customer portal
+  return {
+    data: {
+      url: 'https://billing.stripe.com/mock-portal'
+    }
   }
-  
-  return response.json();
-};
+}
 
 export const sendFacebookConversionEvent = async (data) => {
-  const response = await fetch('/api/functions/send-facebook-conversion-event', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-    credentials: 'include'
-  });
-  
-  if (!response.ok) {
-    throw new Error(`Facebook event failed: ${response.statusText}`);
-  }
-  
-  return response.json();
-};
+  // Mock Facebook event
+  console.log('Mock Facebook conversion event:', data)
+  return { success: true }
+}
 
 export const triggerRevisionWorkflow = async (data) => {
-  const response = await fetch('/api/functions/trigger-revision-workflow', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-    credentials: 'include'
-  });
-  
-  if (!response.ok) {
-    throw new Error(`Revision workflow failed: ${response.statusText}`);
-  }
-  
-  return response.json();
-};
+  // Mock revision workflow
+  console.log('Mock revision workflow:', data)
+  return { success: true, message: 'Revision workflow triggered' }
+}
 
 export const checkVideoStatus = async (data) => {
-  const response = await fetch('/api/functions/check-video-status', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-    credentials: 'include'
-  });
-  
-  if (!response.ok) {
-    throw new Error(`Video status check failed: ${response.statusText}`);
+  // Mock video status check
+  return {
+    status: 'processing',
+    progress: 50,
+    estimated_completion: new Date(Date.now() + 5 * 60 * 1000).toISOString()
   }
-  
-  return response.json();
-};
+}
 
 export const triggerInitialVideoWorkflow = async (data) => {
-  const response = await fetch('/api/functions/trigger-initial-video-workflow', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-    credentials: 'include'
-  });
-  
-  if (!response.ok) {
-    throw new Error(`Initial video workflow failed: ${response.statusText}`);
-  }
-  
-  return response.json();
-};
+  // Mock initial video workflow
+  console.log('Mock initial video workflow:', data)
+  return { success: true, message: 'Initial video workflow triggered' }
+}
 
 export const startVideoProduction = async (data) => {
-  const response = await fetch('/api/functions/start-video-production', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-    credentials: 'include'
-  });
-  
-  if (!response.ok) {
-    throw new Error(`Video production failed: ${response.statusText}`);
-  }
-  
-  return response.json();
-};
+  // Mock video production
+  console.log('Mock video production:', data)
+  return { success: true, video_id: `video_${Date.now()}` }
+}
 
 export const getBlogPosts = async (data = {}) => {
-  const params = new URLSearchParams(data);
-  const response = await fetch(`/api/functions/get-blog-posts?${params}`, {
-    credentials: 'include'
-  });
-  
-  if (!response.ok) {
-    throw new Error(`Get blog posts failed: ${response.statusText}`);
-  }
-  
-  return response.json();
-};
+  // Return empty array to fall back to static posts
+  return { data: { posts: [] } }
+}
 
 export const ensureUserCredits = async () => {
-  const response = await fetch('/api/functions/ensure-user-credits', {
-    method: 'POST',
-    credentials: 'include'
-  });
-  
-  if (!response.ok) {
-    throw new Error(`Ensure user credits failed: ${response.statusText}`);
-  }
-  
-  return response.json();
-};
+  // Mock ensure credits
+  return { success: true, credits_added: 0 }
+}
 
 export const setupNewUser = async () => {
-  const response = await fetch('/api/functions/setup-new-user', {
-    method: 'POST',
-    credentials: 'include'
-  });
-  
-  if (!response.ok) {
-    throw new Error(`Setup new user failed: ${response.statusText}`);
-  }
-  
-  return response.json();
-};
+  // Mock setup new user
+  return { success: true, credits: 20 }
+}
 
 export const syncUserWithStripe = async () => {
-  const response = await fetch('/api/functions/sync-user-with-stripe', {
-    method: 'POST',
-    credentials: 'include'
-  });
-  
-  if (!response.ok) {
-    throw new Error(`Sync with Stripe failed: ${response.statusText}`);
-  }
-  
-  return response.json();
-};
+  // Mock Stripe sync
+  return { success: true }
+}
 
-// Additional functions from the architecture
 export const stripeWebhook = async (data) => {
-  const response = await fetch('/api/functions/stripe-webhook', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-    credentials: 'include'
-  });
-  
-  if (!response.ok) {
-    throw new Error(`Stripe webhook failed: ${response.statusText}`);
-  }
-  
-  return response.json();
-};
+  // Mock webhook
+  return { success: true }
+}
 
 export const n8nVideoCallback = async (data) => {
-  const response = await fetch('/api/functions/n8n-video-callback', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-    credentials: 'include'
-  });
-  
-  if (!response.ok) {
-    throw new Error(`N8N callback failed: ${response.statusText}`);
-  }
-  
-  return response.json();
-};
+  // Mock n8n callback
+  return { success: true }
+}
 
 export const generateSitemap = async () => {
-  const response = await fetch('/api/functions/generate-sitemap', {
-    credentials: 'include'
-  });
-  
-  if (!response.ok) {
-    throw new Error(`Sitemap generation failed: ${response.statusText}`);
-  }
-  
-  return response.json();
-};
+  // Mock sitemap
+  return { success: true }
+}
 
 export const robotsTxt = async () => {
-  const response = await fetch('/api/functions/robots-txt', {
-    credentials: 'include'
-  });
-  
-  if (!response.ok) {
-    throw new Error(`Robots.txt failed: ${response.statusText}`);
-  }
-  
-  return response.text();
-};
+  // Mock robots.txt
+  return 'User-agent: *\nAllow: /'
+}
 
 export const lockingManager = async (data) => {
-  const response = await fetch('/api/functions/locking-manager', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-    credentials: 'include'
-  });
-  
-  if (!response.ok) {
-    throw new Error(`Locking manager failed: ${response.statusText}`);
-  }
-  
-  return response.json();
-};
+  // Mock locking
+  return { success: true }
+}
 
 export const rateLimiter = async (data) => {
-  const response = await fetch('/api/functions/rate-limiter', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-    credentials: 'include'
-  });
-  
-  if (!response.ok) {
-    throw new Error(`Rate limiter failed: ${response.statusText}`);
-  }
-  
-  return response.json();
-};
+  // Mock rate limiter
+  return { success: true, allowed: true }
+}

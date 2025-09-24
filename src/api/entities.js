@@ -1,216 +1,216 @@
-// Base44 Entities SDK - properly structured for the app
+import { supabase } from '@/lib/supabase'
+
 export const Chat = {
   create: async (data) => {
-    const response = await fetch('/api/entities/chat', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-      credentials: 'include'
-    });
+    const { data: result, error } = await supabase
+      .from('chat')
+      .insert(data)
+      .select()
+      .single()
     
-    if (!response.ok) {
-      throw new Error(`Failed to create chat: ${response.statusText}`);
-    }
-    
-    return response.json();
+    if (error) throw new Error(`Failed to create chat: ${error.message}`)
+    return result
   },
 
   get: async (id) => {
-    const response = await fetch(`/api/entities/chat/${id}`, {
-      credentials: 'include'
-    });
+    const { data, error } = await supabase
+      .from('chat')
+      .select('*')
+      .eq('id', id)
+      .single()
     
-    if (!response.ok) {
-      throw new Error(`Failed to get chat: ${response.statusText}`);
-    }
-    
-    return response.json();
+    if (error) throw new Error(`Failed to get chat: ${error.message}`)
+    return data
   },
 
   filter: async (filters, sort = '-created_at') => {
-    const params = new URLSearchParams();
+    let query = supabase.from('chat').select('*')
+    
     Object.entries(filters).forEach(([key, value]) => {
-      params.append(key, value);
-    });
-    params.append('sort', sort);
+      query = query.eq(key, value)
+    })
     
-    const response = await fetch(`/api/entities/chat?${params}`, {
-      credentials: 'include'
-    });
+    // Handle sorting
+    const sortField = sort.startsWith('-') ? sort.slice(1) : sort
+    const ascending = !sort.startsWith('-')
+    query = query.order(sortField, { ascending })
     
-    if (!response.ok) {
-      throw new Error(`Failed to filter chats: ${response.statusText}`);
-    }
-    
-    return response.json();
+    const { data, error } = await query
+    if (error) throw new Error(`Failed to filter chats: ${error.message}`)
+    return data
   },
 
   update: async (id, data) => {
-    const response = await fetch(`/api/entities/chat/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-      credentials: 'include'
-    });
+    const { data: result, error } = await supabase
+      .from('chat')
+      .update(data)
+      .eq('id', id)
+      .select()
+      .single()
     
-    if (!response.ok) {
-      throw new Error(`Failed to update chat: ${response.statusText}`);
-    }
-    
-    return response.json();
+    if (error) throw new Error(`Failed to update chat: ${error.message}`)
+    return result
   }
-};
+}
 
 export const Message = {
   create: async (data) => {
-    const response = await fetch('/api/entities/message', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-      credentials: 'include'
-    });
+    const { data: result, error } = await supabase
+      .from('message')
+      .insert(data)
+      .select()
+      .single()
     
-    if (!response.ok) {
-      throw new Error(`Failed to create message: ${response.statusText}`);
-    }
-    
-    return response.json();
+    if (error) throw new Error(`Failed to create message: ${error.message}`)
+    return result
   },
 
   filter: async (filters, sort = 'created_at') => {
-    const params = new URLSearchParams();
+    let query = supabase.from('message').select('*')
+    
     Object.entries(filters).forEach(([key, value]) => {
-      params.append(key, value);
-    });
-    params.append('sort', sort);
+      query = query.eq(key, value)
+    })
     
-    const response = await fetch(`/api/entities/message?${params}`, {
-      credentials: 'include'
-    });
+    // Handle sorting
+    const sortField = sort.startsWith('-') ? sort.slice(1) : sort
+    const ascending = !sort.startsWith('-')
+    query = query.order(sortField, { ascending })
     
-    if (!response.ok) {
-      throw new Error(`Failed to filter messages: ${response.statusText}`);
-    }
-    
-    return response.json();
+    const { data, error } = await query
+    if (error) throw new Error(`Failed to filter messages: ${error.message}`)
+    return data
   }
-};
+}
 
 export const Video = {
   get: async (id) => {
-    const response = await fetch(`/api/entities/video/${id}`, {
-      credentials: 'include'
-    });
+    const { data, error } = await supabase
+      .from('video')
+      .select('*')
+      .eq('id', id)
+      .single()
     
-    if (!response.ok) {
-      throw new Error(`Failed to get video: ${response.statusText}`);
-    }
-    
-    return response.json();
+    if (error) throw new Error(`Failed to get video: ${error.message}`)
+    return data
   },
 
   filter: async (filters, sort = '-created_at') => {
-    const params = new URLSearchParams();
+    let query = supabase.from('video').select('*')
+    
     Object.entries(filters).forEach(([key, value]) => {
-      params.append(key, value);
-    });
-    params.append('sort', sort);
+      query = query.eq(key, value)
+    })
     
-    const response = await fetch(`/api/entities/video?${params}`, {
-      credentials: 'include'
-    });
+    // Handle sorting
+    const sortField = sort.startsWith('-') ? sort.slice(1) : sort
+    const ascending = !sort.startsWith('-')
+    query = query.order(sortField, { ascending })
     
-    if (!response.ok) {
-      throw new Error(`Failed to filter videos: ${response.statusText}`);
-    }
-    
-    return response.json();
+    const { data, error } = await query
+    if (error) throw new Error(`Failed to filter videos: ${error.message}`)
+    return data
   },
 
   update: async (id, data) => {
-    const response = await fetch(`/api/entities/video/${id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-      credentials: 'include'
-    });
+    const { data: result, error } = await supabase
+      .from('video')
+      .update(data)
+      .eq('id', id)
+      .select()
+      .single()
     
-    if (!response.ok) {
-      throw new Error(`Failed to update video: ${response.statusText}`);
-    }
-    
-    return response.json();
+    if (error) throw new Error(`Failed to update video: ${error.message}`)
+    return result
   }
-};
+}
 
 export const User = {
   me: async () => {
-    const response = await fetch('/api/auth/me', {
-      credentials: 'include'
-    });
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
     
-    if (!response.ok) {
-      if (response.status === 401) {
-        throw new Error('Not authenticated');
-      }
-      throw new Error(`Failed to get user: ${response.statusText}`);
+    if (authError || !user) {
+      throw new Error('Not authenticated')
     }
-    
-    return response.json();
+
+    // Get user profile from users table
+    const { data: profile, error: profileError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', user.id)
+      .single()
+
+    if (profileError) {
+      // If profile doesn't exist, create it
+      const { data: newProfile, error: createError } = await supabase
+        .from('users')
+        .insert({
+          id: user.id,
+          email: user.email,
+          full_name: user.user_metadata?.full_name || user.email.split('@')[0],
+          credits: 20
+        })
+        .select()
+        .single()
+
+      if (createError) {
+        throw new Error(`Failed to create user profile: ${createError.message}`)
+      }
+      
+      return newProfile
+    }
+
+    return profile
   },
 
   login: async () => {
-    // For Base44, we need to redirect directly to the OAuth endpoint
-    // This should be configured in your Base44 project settings
-    const baseUrl = window.location.origin;
-    const redirectUrl = `${baseUrl}/dashboard`;
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/dashboard`
+      }
+    })
     
-    // Redirect to Base44 Google OAuth
-    window.location.href = `/api/auth/google?redirect_url=${encodeURIComponent(redirectUrl)}`;
+    if (error) {
+      throw new Error(`Login failed: ${error.message}`)
+    }
   },
 
   logout: async () => {
-    const response = await fetch('/api/auth/logout', {
-      method: 'POST',
-      credentials: 'include'
-    });
-    
-    if (!response.ok) {
-      throw new Error(`Logout failed: ${response.statusText}`);
+    const { error } = await supabase.auth.signOut()
+    if (error) {
+      throw new Error(`Logout failed: ${error.message}`)
     }
-    
-    return response.json();
   },
 
   update: async (data) => {
-    const response = await fetch('/api/entities/user', {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-      credentials: 'include'
-    });
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
     
-    if (!response.ok) {
-      throw new Error(`Failed to update user: ${response.statusText}`);
+    if (authError || !user) {
+      throw new Error('Not authenticated')
     }
+
+    const { data: result, error } = await supabase
+      .from('users')
+      .update(data)
+      .eq('id', user.id)
+      .select()
+      .single()
     
-    return response.json();
+    if (error) throw new Error(`Failed to update user: ${error.message}`)
+    return result
   }
-};
+}
 
 export const SystemLog = {
   create: async (data) => {
-    const response = await fetch('/api/entities/system-log', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
-      credentials: 'include'
-    });
+    const { data: result, error } = await supabase
+      .from('system_log')
+      .insert(data)
+      .select()
+      .single()
     
-    if (!response.ok) {
-      throw new Error(`Failed to create system log: ${response.statusText}`);
-    }
-    
-    return response.json();
+    if (error) throw new Error(`Failed to create system log: ${error.message}`)
+    return result
   }
-};
+}
