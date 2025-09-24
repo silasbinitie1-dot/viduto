@@ -675,25 +675,27 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
                 
                 <Button
                   type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  variant="outline"
+                  onClick={() => {
+                    if (!newMessage.trim()) {
+                      toast.error('Please enter a description for your video');
+                      return;
+                    }
+                    if (!selectedFile) {
+                      fileInputRef.current?.click();
+                      return;
+                    }
+                    handleSubmit(new Event('submit'));
+                  }}
                   size="icon"
-                  className={`w-10 h-10 ${
-                    darkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : ''
-                  }`}
                   disabled={isSubmitting || generatingBrief}
-                >
-                  <Upload className="w-4 h-4" />
-                </Button>
-                
-                <Button
-                  type="submit"
-                  size="icon"
-                  disabled={(!newMessage.trim() && !selectedFile) || isSubmitting || generatingBrief}
                   className="w-10 h-10 bg-orange-500 text-white hover:bg-orange-600"
                 >
                   {isSubmitting ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : !newMessage.trim() ? (
+                    <Edit3 className="w-4 h-4" />
+                  ) : !selectedFile ? (
+                    <Upload className="w-4 h-4" />
                   ) : (
                     <Send className="w-4 h-4" />
                   )}
