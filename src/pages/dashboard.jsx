@@ -528,7 +528,7 @@ export default function Dashboard() {
                 >
                   <p className="text-sm md:text-base font-normal truncate">{chat.title || 'New Video Project'}</p>
                   <p className={`text-xs md:text-sm mt-1 font-light ${darkMode ? 'text-gray-500' : 'text-gray-600'}`}>
-                    {new Date(chat.updated_date).toLocaleDateString()}
+                    {new Date(chat.updated_at).toLocaleDateString()}
                   </p>
                 </button>
               ))
