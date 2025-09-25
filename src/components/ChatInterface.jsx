@@ -211,15 +211,14 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
       const { Chat } = await import('@/api/entities');
       await Chat.update(chatId, {
         workflow_state: 'in_production',
-        production_started_at: new Date().toISOString(),
-        active_video_id: result.video_id
+        production_started_at: new Date().toISOString()
+        // Don't set active_video_id in demo mode to avoid foreign key constraint
       });
 
       setCurrentChat(prev => ({ 
         ...prev, 
         workflow_state: 'in_production',
-        production_started_at: new Date().toISOString(),
-        active_video_id: result.video_id
+        production_started_at: new Date().toISOString()
       }));
 
       // Add production tracking
@@ -420,8 +419,18 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
               }
             });
             
-            // Trigger video completion handler
-            handleVideoCompleted('https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4');
+            // Reload messages to show the completion
+            const chatMessages = await Message.filter({ chat_id: currentChatId }, 'created_at');
+            setMessages(chatMessages || []);
+            
+            // Clear production tracking
+            setProductionVideos(prev => {
+              const newMap = new Map(prev);
+              newMap.delete(revisionVideoId);
+              return newMap;
+            });
+            
+            toast.success('Your revised video is ready!');
           } catch (error) {
             console.error('Error in demo revision completion:', error);
           }

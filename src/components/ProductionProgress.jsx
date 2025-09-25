@@ -27,45 +27,19 @@ export default function ProductionProgress({
 
     // Polling for video status
     useEffect(() => {
-        if (!pollingActive || !videoId || !chatId) return;
-
-        const pollVideoStatus = async () => {
-            try {
-                const result = await checkVideoStatus({
-                    video_id: videoId,
-                    chat_id: chatId
-                });
-
-                setVideoStatus(result.status);
-                
-                if (result.progress !== undefined) {
-                    setProgress(result.progress);
-                }
-
-                if (result.status === 'completed') {
-                    setPollingActive(false);
-                    setProgress(100);
-                    toast.success('Video completed successfully!');
-                    onVideoCompleted?.(result.video_url);
-                } else if (result.status === 'failed') {
-                    setPollingActive(false);
-                    toast.error(`Video generation failed: ${result.error_message || 'Unknown error'}`);
-                    onCancel?.(chatId, videoId);
-                }
-            } catch (error) {
-                console.error('Error polling video status:', error);
-                // Don't stop polling on individual errors, but reduce frequency
-            }
-        };
-
-        // Initial check
-        pollVideoStatus();
-
-        // Set up polling interval (every 5 seconds)
-        const interval = setInterval(pollVideoStatus, 5000);
-
-        return () => clearInterval(interval);
-    }, [videoId, chatId, pollingActive, onVideoCompleted, onCancel]);
+        // Demo mode - simulate completion after 30 seconds
+        if (!pollingActive) return;
+        
+        const completionTimeout = setTimeout(() => {
+            setVideoStatus('completed');
+            setProgress(100);
+            setPollingActive(false);
+            toast.success('Video completed successfully!');
+            onVideoCompleted?.('https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4');
+        }, 30000); // 30 seconds
+        
+        return () => clearTimeout(completionTimeout);
+    }, [pollingActive, onVideoCompleted]);
 
     useEffect(() => {
         if (!pollingActive) return;
@@ -74,6 +48,10 @@ export default function ProductionProgress({
             const now = Date.now();
             const elapsed = Math.floor((now - startedAt) / 1000); // seconds
             setTimeElapsed(elapsed);
+            
+            // Update progress based on elapsed time (30 second completion)
+            const progressPercent = Math.min((elapsed / 30) * 100, 99);
+            setProgress(progressPercent);
         }, 1000);
 
         return () => clearInterval(timeInterval);
