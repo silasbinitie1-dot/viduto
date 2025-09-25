@@ -238,7 +238,36 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
 
     } catch (error) {
       console.error('Error starting production:', error);
-      toast.error(error.message || 'Failed to start video production. Please try again.');
+      
+      // Create an error message in the chat
+      const { Message } = await import('@/api/entities');
+      await Message.create({
+        chat_id: chatId,
+        message_type: 'assistant',
+        content: `❌ ${error.message || 'An error occurred while starting video production. Please contact support or try again later.'}`,
+        metadata: { 
+          is_error: true,
+          error_timestamp: new Date().toISOString()
+        }
+      });
+
+      // Update local messages to show the error immediately
+      const errorMessage = {
+        id: `error_${Date.now()}`,
+        chat_id: chatId,
+        message_type: 'assistant',
+        content: `❌ ${error.message || 'An error occurred while starting video production. Please contact support or try again later.'}`,
+        metadata: { 
+          is_error: true,
+          error_timestamp: new Date().toISOString()
+        },
+        created_at: new Date().toISOString()
+      };
+      
+      setMessages(prev => [...prev, errorMessage]);
+      
+      // Also show toast for immediate feedback
+      toast.error('Production failed - see chat for details');
     } finally {
       setLoading(false);
     }
