@@ -322,8 +322,10 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
       // Handle file upload if present
       let fileUrl = null;
       if (selectedFile) {
+        console.log('ChatInterface - Uploading file:', { name: selectedFile.name, size: selectedFile.size, type: selectedFile.type });
         const { UploadFile } = await import('@/api/integrations');
         const uploadResult = await UploadFile({ file: selectedFile });
+        console.log('ChatInterface - Upload result:', uploadResult);
         fileUrl = uploadResult.file_url;
       }
 
