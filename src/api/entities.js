@@ -162,6 +162,12 @@ export const User = {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     
     if (authError) {
+      // If there's no user, this is expected (not logged in)
+      if (!user) {
+        console.warn('Auth session missing:', authError.message)
+        return null
+      }
+      // If there's a user but still an error, this is unexpected
       console.error('Auth error:', authError)
       throw new Error('Authentication failed')
     }
