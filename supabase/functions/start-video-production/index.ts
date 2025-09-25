@@ -32,13 +32,15 @@ Deno.serve(async (req: Request) => {
       throw new Error('No authorization header')
     }
 
+    // Extract token from Bearer header
+    const token = authHeader.replace('Bearer ', '')
+    
     // Verify user authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser(
-      authHeader.replace('Bearer ', '')
-    )
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
 
     if (authError || !user) {
-      throw new Error('Authentication failed')
+      console.error('Auth error:', authError)
+      throw new Error(`Authentication failed: ${authError?.message || 'Invalid token'}`)
     }
 
     const { chat_id, brief, image_url, is_revision = false, credits_used = 10 }: VideoProductionRequest = await req.json()
