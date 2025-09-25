@@ -167,7 +167,7 @@ export const User = {
     }
     
     if (!user) {
-      throw new Error('Not authenticated')
+      return null
     }
     
     // Get user profile from users table
