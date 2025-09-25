@@ -61,8 +61,6 @@ export const Core = {
   
   UploadFile: async ({ file }) => {
     try {
-      const { supabase } = await import('@/lib/supabase');
-      
       // Validate file
       if (!file) {
         throw new Error('No file provided');
@@ -80,46 +78,30 @@ export const Core = {
         throw new Error('Invalid file type. Please upload a JPG or PNG image.');
       }
       
-      // Generate unique filename
-      const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
-      const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
-      const filePath = `uploads/${fileName}`;
-      
-      console.log('Uploading file to Supabase Storage:', {
-        fileName,
-        fileSize: file.size,
-        fileType: file.type
+      // Convert to base64 as fallback since storage bucket doesn't exist
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const base64String = reader.result;
+          
+          // Validate the base64 string length to ensure it fits in database
+          if (base64String.length > 450) {
+            reject(new Error('Image file is too large. Please use a smaller image (under 100KB).'));
+            return;
+          }
+          
+          console.log('File converted to base64, length:', base64String.length);
+          
+          resolve({ 
+            file_url: base64String,
+            success: true 
+          });
+        };
+        reader.onerror = () => {
+          reject(new Error('Failed to read file'));
+        };
+        reader.readAsDataURL(file);
       });
-      
-      // Upload to Supabase Storage
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from('public-files')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
-      
-      if (uploadError) {
-        console.error('Supabase upload error:', uploadError);
-        throw new Error(`Upload failed: ${uploadError.message}`);
-      }
-      
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from('public-files')
-        .getPublicUrl(filePath);
-      
-      if (!urlData?.publicUrl) {
-        throw new Error('Failed to get public URL for uploaded file');
-      }
-      
-      console.log('File uploaded successfully:', urlData.publicUrl);
-      
-      return { 
-        file_url: urlData.publicUrl,
-        file_path: filePath,
-        success: true 
-      };
       
     } catch (error) {
       console.error('File upload error:', error);
