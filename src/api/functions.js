@@ -153,7 +153,11 @@ export const triggerInitialVideoWorkflow = async (data) => {
     throw error
   }
 }
-  
+
+export const startVideoProduction = async (data) => {
+  // This function is now handled by triggerInitialVideoWorkflow
+  return triggerInitialVideoWorkflow(data)
+}
 
 export const getBlogPosts = async (data = {}) => {
   // Return empty array to fall back to static posts
