@@ -292,9 +292,9 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
 
       // Check if chat is in production state
       if (currentChat?.workflow_state === 'in_production' && currentChat?.production_started_at) {
-        const videoId = `video_${chatId}_production`;
+        const videoId = currentChat?.active_video_id || crypto.randomUUID();
         productionMap.set(videoId, {
-          messageId: `production_${chatId}`,
+          messageId: currentChat?.active_video_id ? `production_${currentChat.active_video_id}` : `production_${chatId}`,
           startedAt: new Date(currentChat.production_started_at).getTime(),
           chatId: chatId,
           videoId: videoId
@@ -393,7 +393,7 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
         generateVideoBrief([userMessage], chat, newMessage.trim(), fileUrl);
       } else {
         // This is a revision request - simulate for demo
-        const revisionVideoId = `revision_${Date.now()}`;
+        const revisionVideoId = crypto.randomUUID();
         
         // Add production tracking for revision
         setProductionVideos(prev => new Map(prev).set(revisionVideoId, {

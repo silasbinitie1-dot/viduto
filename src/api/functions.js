@@ -114,8 +114,8 @@ export const checkVideoStatus = async (data) => {
 }
 
 export const triggerInitialVideoWorkflow = async (data) => {
-  // Demo mode - simulate video production start
-  const video_id = `demo_${Date.now()}_${Math.random().toString(36).substring(2)}`;
+  // Demo mode - generate proper UUID for video_id
+  const video_id = crypto.randomUUID();
   
   // Simulate deducting credits (in real app this would be done server-side)
   console.log('Demo: Starting video production for chat:', data.chat_id);
@@ -124,7 +124,8 @@ export const triggerInitialVideoWorkflow = async (data) => {
     success: true,
     video_id: video_id,
     message: 'Video production started successfully (demo mode)',
-    estimated_completion: new Date(Date.now() + 30000).toISOString() // 30 seconds
+    estimated_completion: new Date(Date.now() + 30000).toISOString(), // 30 seconds
+    demo_mode: true
   };
 }
 

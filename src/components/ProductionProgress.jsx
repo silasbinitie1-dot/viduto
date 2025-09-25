@@ -87,10 +87,10 @@ export default function ProductionProgress({
 
     const getStatusMessage = () => {
         if (videoStatus === 'processing') {
-            const estimateSeconds = 30; // 30 seconds for demo
+            const estimateSeconds = 30000; // 30 seconds for demo (in milliseconds)
             
-            if (timeElapsed < estimateSeconds) {
-                const remaining = estimateSeconds - timeElapsed;
+            if (timeElapsed * 1000 < estimateSeconds) {
+                const remaining = estimateSeconds - (timeElapsed * 1000);
                 const remainingSeconds = Math.ceil(remaining / 1000);
                 return `Creating your ${isRevision ? 'revised ' : ''}video... About ${remainingSeconds} seconds remaining (demo mode)`;
             } else {
