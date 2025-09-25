@@ -132,6 +132,15 @@ Deno.serve(async (req: Request) => {
       is_revision: is_revision,
       callback_url: callbackUrl
     }
+    
+    // Log the payload to debug
+    console.log('N8N Payload image_url:', image_url ? image_url.substring(0, 100) + '...' : 'null')
+    
+    // Validate image URL one more time before sending to N8N
+    if (image_url && image_url.startsWith('data:')) {
+      console.error('About to send base64 URL to N8N - this is wrong!')
+      throw new Error('Cannot process base64 image URL - please re-upload your image')
+    }
 
     // Get N8N webhook URL from environment
     const n8nWebhookUrl = is_revision 
