@@ -3,6 +3,12 @@ import { supabase } from '@/lib/supabase'
 export const Core = {
   InvokeLLM: async ({ prompt, image_url, max_tokens = 2000 }) => {
     try {
+      console.log('InvokeLLM called with:', {
+        prompt: prompt ? `${prompt.substring(0, 100)}...` : 'No prompt',
+        image_url: image_url ? `${image_url.substring(0, 50)}...` : 'No image',
+        max_tokens
+      });
+
       // Call the Supabase Edge Function instead of OpenAI directly
       const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generateVideoBrief`;
       
@@ -10,6 +16,8 @@ export const Core = {
         'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
         'Content-Type': 'application/json',
       };
+
+      console.log('Calling Edge Function at:', apiUrl);
 
       const response = await fetch(apiUrl, {
         method: 'POST',
@@ -21,12 +29,23 @@ export const Core = {
         })
       });
 
+      console.log('Edge Function response status:', response.status);
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.details || `API Error: ${response.status} ${response.statusText}`);
+        let errorData;
+        try {
+          errorData = await response.json();
+          console.error('Edge Function error response:', errorData);
+        } catch (parseError) {
+          console.error('Failed to parse error response:', parseError);
+          errorData = { error: 'Unknown error', details: await response.text() };
+        }
+        
+        throw new Error(errorData.details || errorData.error || `API Error: ${response.status} ${response.statusText}`);
       }
 
       const result = await response.json();
+      console.log('Edge Function success, response length:', result.response?.length || 0);
       return result;
     } catch (error) {
       console.error('Video Brief Generation Error:', error);

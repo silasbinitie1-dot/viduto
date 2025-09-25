@@ -23,7 +23,27 @@ Deno.serve(async (req: Request) => {
       );
     }
 
-    const { prompt, image_url, max_tokens = 2000 } = await req.json();
+    let requestBody;
+    try {
+      requestBody = await req.json();
+    } catch (parseError) {
+      console.error('Failed to parse request body:', parseError);
+      return new Response(
+        JSON.stringify({ error: "Invalid JSON in request body" }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    const { prompt, image_url, max_tokens = 2000 } = requestBody;
+
+    console.log('Edge Function received request:', {
+      prompt: prompt ? `${prompt.substring(0, 100)}...` : 'No prompt',
+      image_url: image_url ? `${image_url.substring(0, 50)}...` : 'No image',
+      max_tokens
+    });
 
     if (!prompt) {
       return new Response(
@@ -40,13 +60,18 @@ Deno.serve(async (req: Request) => {
     if (!openaiApiKey) {
       console.error('OpenAI API key not configured');
       return new Response(
-        JSON.stringify({ error: "OpenAI API key not configured" }),
+        JSON.stringify({ 
+          error: "OpenAI API key not configured",
+          details: "Please configure OPENAI_API_KEY in Supabase Edge Function environment variables"
+        }),
         {
           status: 500,
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
     }
+
+    console.log('OpenAI API key found, proceeding with request...');
 
     const systemPrompt = `CRITICAL INSTRUCTION
 The voiceover for EACH SCENE must contain EXACTLY 15 words. Not 14, not 16. Your response will be validated and rejected if this rule is not followed precisely.

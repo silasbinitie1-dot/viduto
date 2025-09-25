@@ -94,6 +94,11 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
         throw new Error('Product image is required for brief generation');
       }
 
+      // Check if image URL is too long (likely base64)
+      if (image.length > 500) {
+        throw new Error('Image URL is too long. Please upload the image again - it may be corrupted.');
+      }
+
       console.log('Generating brief with OpenAI...', { prompt, image });
 
       // Call LLM to generate brief
@@ -107,6 +112,10 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
       console.log('OpenAI response received:', llmResponse);
 
       const generatedBrief = llmResponse.response;
+
+      if (!generatedBrief) {
+        throw new Error('No brief content received from AI');
+      }
 
       // Create assistant message with the brief
       const { Message } = await import('@/api/entities');
@@ -138,7 +147,19 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
 
     } catch (error) {
       console.error('Error generating brief:', error);
-      toast.error('Failed to generate video brief. Please try again.');
+      
+      // Provide more specific error messages
+      let errorMessage = 'Failed to generate video brief. Please try again.';
+      
+      if (error.message.includes('API key')) {
+        errorMessage = 'AI service configuration error. Please contact support.';
+      } else if (error.message.includes('too long')) {
+        errorMessage = 'Image file is too large. Please upload a smaller image.';
+      } else if (error.message.includes('401')) {
+        errorMessage = 'Authentication error with AI service. Please contact support.';
+      }
+      
+      toast.error(errorMessage);
       setShowGeneratingBrief(false);
     }
   };
