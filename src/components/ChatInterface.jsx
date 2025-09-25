@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Send, Upload, X, Plus, Loader2, Play, Edit3, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Chat, Message, User } from '@/api/entities';
+import { Chat, Message } from '@/api/entities';
 import { UploadFile, InvokeLLM } from '@/api/integrations';
 import { VideoPlayer } from './VideoPlayer';
 import ProductionProgress from './ProductionProgress';
@@ -81,9 +81,7 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
       let image = imageUrl;
       
       if (!prompt || !image) {
-        const initialMessage = chatMessages.find(msg => 
-          msg.message_type === 'user' && msg.metadata?.is_initial_request
-        );
+        const initialMessage = chatMessages.find(msg => msg.message_type === 'user');
         
         if (!initialMessage) {
           throw new Error('No initial request found');
@@ -110,8 +108,9 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
 
       const generatedBrief = llmResponse.response;
 
-      // Create assistant message with the brief - only if one doesn't exist
-      const briefMessage = await Message.create({
+      // Create assistant message with the brief
+      const { Message: MessageEntity } = await import('@/api/entities');
+      const briefMessage = await MessageEntity.create({
         chat_id: chat.id,
         message_type: 'assistant',
         content: generatedBrief,
@@ -122,7 +121,8 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
       });
 
       // Update chat state
-      await Chat.update(chat.id, {
+      const { Chat: ChatEntity } = await import('@/api/entities');
+      await ChatEntity.update(chat.id, {
         workflow_state: 'awaiting_approval',
         brief: generatedBrief
       });
@@ -154,7 +154,8 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
   const handleSaveBrief = async () => {
     try {
       // Update chat with new brief
-      await Chat.update(chatId, { brief: briefText });
+      const { Chat: ChatEntity } = await import('@/api/entities');
+      await ChatEntity.update(chatId, { brief: briefText });
 
       // Update local state without creating new message
       setCurrentBrief(briefText);
@@ -179,8 +180,8 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
   const handleApproveBrief = async () => {
     // Check if user has enough credits before starting production
     try {
-      const { User: UserEntity } = await import('@/api/entities');
-      const currentUser = await UserEntity.me();
+      const { User } = await import('@/api/entities');
+      const currentUser = await User.me();
       if (!currentUser || currentUser.credits < 10) {
         toast.error('Insufficient credits. You need 10 credits to start video production.');
         return;
@@ -298,7 +299,8 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
 
       // Create new chat if none exists
       if (!currentChatId) {
-        chat = await Chat.create({
+        const { Chat: ChatEntity } = await import('@/api/entities');
+        chat = await ChatEntity.create({
           title: newMessage.trim() || 'Creating brief...',
           status: 'active',
           workflow_state: 'draft'
@@ -316,14 +318,12 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
       }
 
       // Create user message
-      const userMessage = await Message.create({
+      const { Message: MessageEntity } = await import('@/api/entities');
+      const userMessage = await MessageEntity.create({
         chat_id: currentChatId,
         message_type: 'user',
         content: newMessage.trim(),
-        metadata: { 
-          image_url: fileUrl,
-          is_initial_request: messages.length === 0
-        }
+        metadata: { image_url: fileUrl }
       });
 
       // Update messages immediately
