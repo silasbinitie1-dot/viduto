@@ -73,6 +73,30 @@ export const startVideoProduction = async (data) => {
       throw new Error(`Insufficient credits. You need ${creditsRequired} credits to start video production.`);
     }
 
+    // Validate and truncate URLs if necessary
+    const truncateUrl = (url, maxLength = 500) => {
+      if (!url) return null;
+      if (url.length <= maxLength) return url;
+      
+      // If it's a base64 data URL, we need to handle it differently
+      if (url.startsWith('data:')) {
+        console.warn('Base64 data URL detected, this should be uploaded to storage first');
+        // For now, return null and let the system handle it
+        return null;
+      }
+      
+      // For regular URLs, truncate but warn
+      console.warn(`URL truncated from ${url.length} to ${maxLength} characters`);
+      return url.substring(0, maxLength);
+    };
+
+    const processedImageUrl = truncateUrl(data.imageUrl);
+    const processedBrief = data.brief ? data.brief.substring(0, 5000) : null; // Truncate brief if too long
+
+    if (!processedImageUrl) {
+      throw new Error('Invalid or missing image URL. Please upload the image again.');
+    }
+
     // Deduct credits from user account
     const { error: updateError } = await supabase
       .from('users')
@@ -95,8 +119,8 @@ export const startVideoProduction = async (data) => {
       .insert({
         video_id: videoId,
         chat_id: data.chatId,
-        prompt: data.brief,
-        image_url: data.imageUrl,
+        prompt: processedBrief,
+        image_url: processedImageUrl,
         status: 'pending',
         credits_used: creditsRequired,
         credits_charged: creditsRequired,
@@ -142,13 +166,21 @@ export const startVideoProduction = async (data) => {
       user_id: user.id,
       user_email: userProfile.email,
       user_name: userProfile.full_name,
-      prompt: data.brief,
-      image_url: data.imageUrl,
+      prompt: processedBrief,
+      image_url: processedImageUrl,
       is_revision: data.isRevision || false,
-      callback_url: `${import.meta.env.VITE_N8N_CALLBACK_URL || window.location.origin}/functions/v1/n8nVideoCallback`,
+      callback_url: `${import.meta.env.VITE_N8N_CALLBACK_URL || 'https://viduto-tsng.bolt.host'}/functions/v1/n8nVideoCallback`,
       credits_used: creditsRequired,
       timestamp: new Date().toISOString()
     };
+
+    console.log('N8N Payload prepared:', {
+      video_id: videoId,
+      chat_id: data.chatId,
+      callback_url: n8nPayload.callback_url,
+      image_url_length: processedImageUrl?.length,
+      brief_length: processedBrief?.length
+    });
 
     // Trigger n8n webhook
     const n8nWebhookUrl = import.meta.env.VITE_N8N_INITIAL_VIDEO_WEBHOOK_URL;
@@ -163,10 +195,13 @@ export const startVideoProduction = async (data) => {
         });
 
         if (!response.ok) {
-          throw new Error(`N8N webhook failed: ${response.status} ${response.statusText}`);
+          const errorText = await response.text();
+          console.error('N8N webhook response:', response.status, errorText);
+          throw new Error(`N8N webhook failed: ${response.status} ${response.statusText} - ${errorText}`);
         }
 
-        console.log('N8N webhook triggered successfully for video:', videoId);
+        const responseData = await response.json().catch(() => ({}));
+        console.log('N8N webhook triggered successfully:', responseData);
       } catch (webhookError) {
         console.error('N8N webhook error:', webhookError);
         

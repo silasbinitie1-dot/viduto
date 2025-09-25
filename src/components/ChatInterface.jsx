@@ -189,12 +189,19 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
         return;
       }
 
+      // Validate image URL length
+      const imageUrl = initialMessage.metadata.image_url;
+      if (imageUrl && imageUrl.length > 500) {
+        toast.error('Image URL is too long. Please upload the image again.');
+        return;
+      }
+
       // Call the production function with proper parameters
       const { startVideoProduction } = await import('@/api/functions');
       const result = await startVideoProduction({
         chatId: chatId,
         brief: currentBrief || briefText,
-        imageUrl: initialMessage.metadata.image_url,
+        imageUrl: imageUrl,
         creditsUsed: 10,
         isRevision: false
       });
