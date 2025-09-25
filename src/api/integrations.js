@@ -240,6 +240,7 @@ Voiceover: [Exactly 15 words - verified word count]
       const filePath = `uploads/${fileName}`
 
       console.log('Uploading file:', { name: file.name, size: file.size, type: file.type })
+      console.log('Generated file path:', filePath)
 
       // Upload to Supabase Storage
       const { data, error } = await supabase.storage
@@ -259,6 +260,11 @@ Voiceover: [Exactly 15 words - verified word count]
         .getPublicUrl(filePath)
 
       console.log('Generated public URL:', publicUrl)
+      
+      // Validate that we're not returning a base64 URL
+      if (publicUrl.startsWith('data:')) {
+        throw new Error('Upload failed - received base64 URL instead of storage URL')
+      }
 
       return { file_url: publicUrl }
     } catch (error) {

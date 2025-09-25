@@ -327,6 +327,11 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
         const uploadResult = await UploadFile({ file: selectedFile });
         console.log('ChatInterface - Upload result:', uploadResult);
         fileUrl = uploadResult.file_url;
+        
+        // Validate that we got a proper URL, not base64
+        if (fileUrl && fileUrl.startsWith('data:')) {
+          throw new Error('File upload failed - received base64 URL instead of storage URL');
+        }
       }
 
       // Create user message

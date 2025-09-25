@@ -184,6 +184,11 @@ export default function Home() {
         });
 
         const { file_url } = await UploadFile({ file: selectedFile });
+        
+        // Validate that we got a proper URL, not base64
+        if (file_url && file_url.startsWith('data:')) {
+          throw new Error('File upload failed - received base64 URL instead of storage URL');
+        }
 
         await Message.create({
           chat_id: newChat.id,
@@ -193,7 +198,7 @@ export default function Home() {
         });
 
         sessionStorage.removeItem('pendingChatData');
-        console.log('Upload result:', uploadResult);
+        console.log('Upload result:', { file_url });
         navigate(`/dashboard?chat=${newChat.id}`);
       }
     } catch (error) {
