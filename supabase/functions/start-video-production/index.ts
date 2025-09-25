@@ -64,7 +64,7 @@ Deno.serve(async (req: Request) => {
       throw new Error('Insufficient credits')
     }
 
-    // Deduct credits
+    // Deduct credits first
     const { error: creditError } = await supabase
       .from('users')
       .update({ credits: userProfile.credits - credits_used })
@@ -75,25 +75,31 @@ Deno.serve(async (req: Request) => {
     }
 
     // Generate unique video ID
-    const video_id = `video_${chat_id}_${Date.now()}`
+    const video_id = crypto.randomUUID()
 
-    // Create video record
+    // Create video record using ONLY the columns that exist in your current schema
     const { data: video, error: videoError } = await supabase
       .from('video')
       .insert({
         id: video_id,
         chat_id: chat_id,
-        user_id: user.id,
         prompt: brief,
         image_url: image_url,
         status: 'processing',
-        processing_started_at: new Date().toISOString(),
-        is_revision: is_revision
+        credits_used: credits_used,
+        processing_started_at: new Date().toISOString()
+        // Removed user_id and is_revision since they don't exist in current schema
       })
       .select()
       .single()
 
     if (videoError) {
+      // Refund credits if video creation fails
+      await supabase
+        .from('users')
+        .update({ credits: userProfile.credits })
+        .eq('id', user.id)
+      
       throw new Error(`Failed to create video record: ${videoError.message}`)
     }
 
@@ -108,7 +114,8 @@ Deno.serve(async (req: Request) => {
       .eq('id', chat_id)
 
     if (chatError) {
-      throw new Error(`Failed to update chat state: ${chatError.message}`)
+      console.error('Failed to update chat state:', chatError)
+      // Don't throw here as video creation was successful
     }
 
     // Prepare callback URL
@@ -132,30 +139,40 @@ Deno.serve(async (req: Request) => {
       ? Deno.env.get('N8N_REVISION_WEBHOOK_URL')
       : Deno.env.get('N8N_INITIAL_VIDEO_WEBHOOK_URL')
 
-    if (!n8nWebhookUrl) {
-      throw new Error('N8N webhook URL not configured')
-    }
+    if (n8nWebhookUrl) {
+      try {
+        // Trigger N8N workflow
+        const n8nResponse = await fetch(n8nWebhookUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(n8nPayload)
+        })
 
-    // Trigger N8N workflow
-    const n8nResponse = await fetch(n8nWebhookUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(n8nPayload)
-    })
-
-    if (!n8nResponse.ok) {
-      throw new Error(`N8N webhook failed: ${n8nResponse.statusText}`)
+        if (!n8nResponse.ok) {
+          console.error('N8N webhook failed:', n8nResponse.statusText)
+          // Don't throw here - video record is created, just log the issue
+        }
+      } catch (n8nError) {
+        console.error('N8N webhook error:', n8nError)
+        // Don't throw here - video record is created, just log the issue
+      }
+    } else {
+      console.warn('N8N webhook URL not configured')
     }
 
     // Log system activity
     await supabase
       .from('system_log')
       .insert({
-        user_id: user.id,
-        action: is_revision ? 'video_revision_started' : 'video_production_started',
-        details: {
+        operation: is_revision ? 'video_revision_started' : 'video_production_started',
+        entity_type: 'video',
+        entity_id: video_id,
+        user_email: user.email,
+        status: 'success',
+        message: `Video ${is_revision ? 'revision' : 'production'} started successfully`,
+        metadata: {
           video_id: video_id,
           chat_id: chat_id,
           credits_used: credits_used

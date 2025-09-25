@@ -44,6 +44,18 @@ Deno.serve(async (req: Request) => {
       throw new Error(`Video record not found: ${video_id}`)
     }
 
+    // Get user_id from the associated chat since video table doesn't have user_id yet
+    const { data: chat, error: chatError } = await supabase
+      .from('chat')
+      .select('user_id')
+      .eq('id', chat_id)
+      .single()
+
+    if (chatError || !chat) {
+      throw new Error(`Chat record not found: ${chat_id}`)
+    }
+
+    const userId = chat.user_id
     if (status === 'completed' && video_url) {
       // Update video record with completion data
       const { error: videoUpdateError } = await supabase
@@ -110,9 +122,13 @@ Deno.serve(async (req: Request) => {
       await supabase
         .from('system_log')
         .insert({
-          user_id: video.user_id,
-          action: video.is_revision ? 'video_revision_completed' : 'video_production_completed',
-          details: {
+          operation: 'video_production_completed',
+          entity_type: 'video',
+          entity_id: video_id,
+          user_email: userId,
+          status: 'success',
+          message: 'Video production completed successfully',
+          metadata: {
             video_id: video_id,
             chat_id: chat_id,
             processing_time: processing_time,
@@ -161,23 +177,27 @@ Deno.serve(async (req: Request) => {
       const { data: userProfile } = await supabase
         .from('users')
         .select('credits')
-        .eq('id', video.user_id)
+        .eq('id', userId)
         .single()
 
       if (userProfile) {
         await supabase
           .from('users')
-          .update({ credits: userProfile.credits + (video.is_revision ? 2.5 : 10) })
-          .eq('id', video.user_id)
+          .update({ credits: userProfile.credits + 10 }) // Refund 10 credits for failed production
+          .eq('id', userId)
       }
 
       // Log failure
       await supabase
         .from('system_log')
         .insert({
-          user_id: video.user_id,
-          action: 'video_production_failed',
-          details: {
+          operation: 'video_production_failed',
+          entity_type: 'video',
+          entity_id: video_id,
+          user_email: userId,
+          status: 'error',
+          message: 'Video production failed',
+          metadata: {
             video_id: video_id,
             chat_id: chat_id,
             error_message: error_message
