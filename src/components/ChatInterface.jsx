@@ -40,6 +40,8 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
         setChatLoading(false);
         setMessages([]);
         setCurrentChat(null);
+        setCurrentBrief(null);
+        setBriefText('');
         return;
       }
 
@@ -51,16 +53,20 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
         const chatMessages = await Message.filter({ chat_id: chatId }, 'created_at');
         setMessages(chatMessages || []);
 
-        // Check if we need to generate a brief
-        const hasInitialRequest = chatMessages?.some(msg => 
-          msg.message_type === 'user' && msg.metadata?.is_initial_request
-        );
-        const hasBrief = chatMessages?.some(msg => 
-          msg.message_type === 'assistant' && msg.metadata?.is_brief
-        );
-
-        if (hasInitialRequest && !hasBrief && chat.workflow_state === 'draft') {
-          await generateVideoBrief(chatMessages, chat);
+        // Set current brief from existing messages
+        const briefMessage = chatMessages?.find(msg => msg.metadata?.is_brief);
+        if (briefMessage) {
+          setCurrentBrief(briefMessage.content);
+          setBriefText(briefMessage.content);
+        } else {
+          // Only generate brief if none exists and we have an initial request
+          const hasInitialRequest = chatMessages?.some(msg => 
+            msg.message_type === 'user' && msg.metadata?.is_initial_request
+          );
+          
+          if (hasInitialRequest && chat.workflow_state === 'draft') {
+            await generateVideoBrief(chatMessages, chat);
+          }
         }
       } catch (error) {
         console.error('Error loading chat:', error);
@@ -153,28 +159,19 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
 
   const handleSaveBrief = async () => {
     try {
-      // Update the brief message
-      const briefMessage = messages.find(msg => msg.metadata?.is_brief);
-      if (briefMessage) {
-        // Create new message with updated brief
-        const updatedMessage = await Message.create({
-          chat_id: chatId,
-          message_type: 'assistant',
-          content: briefText,
-          metadata: { 
-            is_brief: true,
-            brief_updated_at: new Date().toISOString()
-          }
-        });
+      // Update chat with new brief
+      await Chat.update(chatId, { brief: briefText });
 
-        // Update chat
-        await Chat.update(chatId, { brief: briefText });
-
-        // Update local state
-        setMessages(prev => [...prev, updatedMessage]);
-        setCurrentBrief(briefText);
-        setCurrentChat(prev => ({ ...prev, brief: briefText }));
-      }
+      // Update local state without creating new message
+      setCurrentBrief(briefText);
+      setCurrentChat(prev => ({ ...prev, brief: briefText }));
+      
+      // Update the existing brief message in local state
+      setMessages(prev => prev.map(msg => 
+        msg.metadata?.is_brief 
+          ? { ...msg, content: briefText, metadata: { ...msg.metadata, brief_updated_at: new Date().toISOString() } }
+          : msg
+      ));
 
       setEditingBrief(false);
       toast.success('Brief updated successfully!');
@@ -345,7 +342,8 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
       }
 
       // If this is the first message, trigger brief generation
-      if (messages.length === 0 && fileUrl) {
+      const isFirstMessage = messages.length === 0;
+      if (isFirstMessage && fileUrl) {
         // Generate brief immediately for first message
         await generateVideoBrief([userMessage], chat, newMessage.trim(), fileUrl);
       } else {
@@ -402,14 +400,16 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
     }
   };
 
-  // Get the current brief from messages
+  // Get the current brief from messages - only run once when messages change
   useEffect(() => {
-    const briefMessage = messages.find(msg => msg.metadata?.is_brief);
-    if (briefMessage) {
-      setCurrentBrief(briefMessage.content);
-      setBriefText(briefMessage.content);
+    if (!currentBrief) {
+      const briefMessage = messages.find(msg => msg.metadata?.is_brief);
+      if (briefMessage) {
+        setCurrentBrief(briefMessage.content);
+        setBriefText(briefMessage.content);
+      }
     }
-  }, [messages]);
+  }, [messages, currentBrief]);
 
   if (chatLoading) {
     return (
@@ -471,7 +471,7 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
                       darkMode ? 'bg-orange-600 text-white' : 'bg-orange-500 text-white'
                     }`}>
                       <p className="font-light">{message.content}</p>
-                      {message.metadata?.image_url && (
+                      {message.metadata?.image_url && message.metadata?.is_initial_request && (
                         <div className="mt-3">
                           <img
                             src={message.metadata.image_url}
@@ -495,17 +495,19 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
                         <h3 className={`text-lg font-normal ${darkMode ? 'text-white' : 'text-gray-900'}`}>
                           📋 Video Brief
                         </h3>
-                        <div className="flex gap-2">
-                          <Button
-                            onClick={handleEditBrief}
-                            variant="outline"
-                            size="sm"
-                            className={`gap-2 ${darkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : ''}`}
-                          >
-                            <Edit3 className="w-4 h-4" />
-                            Edit
-                          </Button>
-                        </div>
+                        {!editingBrief && (
+                          <div className="flex gap-2">
+                            <Button
+                              onClick={handleEditBrief}
+                              variant="outline"
+                              size="sm"
+                              className={`gap-2 ${darkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : ''}`}
+                            >
+                              <Edit3 className="w-4 h-4" />
+                              Edit
+                            </Button>
+                          </div>
+                        )}
                       </div>
 
                       {editingBrief ? (
@@ -544,10 +546,10 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
                           <div className={`prose prose-sm max-w-none ${
                             darkMode ? 'prose-invert' : ''
                           }`}>
-                            <div className={`whitespace-pre-wrap font-light ${
+                            <div className={`whitespace-pre-wrap font-light leading-relaxed ${
                               darkMode ? 'text-gray-300' : 'text-gray-700'
                             }`}>
-                              {message.content}
+                              {currentBrief || message.content}
                             </div>
                           </div>
 
