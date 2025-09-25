@@ -74,6 +74,31 @@ Deno.serve(async (req: Request) => {
       )
     }
 
+    // Verify user owns this chat
+    console.log('🔍 Verifying chat ownership...')
+    const { data: chat, error: chatError } = await supabase
+      .from('chat')
+      .select('user_id')
+      .eq('id', chat_id)
+      .single()
+
+    if (chatError || !chat) {
+      console.log('❌ Chat not found:', chatError?.message || 'No chat data')
+      return new Response(
+        JSON.stringify({ success: false, error: 'Chat not found' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    if (chat.user_id !== user.id) {
+      console.log('❌ Chat ownership mismatch:', { chat_user_id: chat.user_id, user_id: user.id })
+      return new Response(
+        JSON.stringify({ success: false, error: 'Chat not found or access denied' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+    console.log('✅ Chat ownership verified')
+
     // Generate unique video ID
     const video_id = crypto.randomUUID()
     console.log('🆔 Generated video_id:', video_id)
