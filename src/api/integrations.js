@@ -1,54 +1,221 @@
 import { supabase } from '@/lib/supabase'
+import OpenAI from 'openai'
+
+// Initialize OpenAI client
+const openai = new OpenAI({
+  apiKey: import.meta.env.VITE_OPENAI_API_KEY,
+  dangerouslyAllowBrowser: true
+})
 
 export const Core = {
   InvokeLLM: async ({ prompt, image_url, max_tokens = 2000 }) => {
     try {
-      console.log('InvokeLLM called with:', {
-        prompt: prompt ? `${prompt.substring(0, 100)}...` : 'No prompt',
-        image_url: image_url ? `${image_url.substring(0, 50)}...` : 'No image',
-        max_tokens
-      });
+      const systemPrompt = `CRITICAL INSTRUCTION
+The voiceover for EACH SCENE must contain EXACTLY 15 words. Not 14, not 16. Your response will be validated and rejected if this rule is not followed precisely.
 
-      // Call the Supabase Edge Function instead of OpenAI directly
-      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generateVideoBrief`;
-      
-      const headers = {
-        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
-        'Content-Type': 'application/json',
-      };
+VOICEOVER WORD COUNT EXAMPLES
+Correct: This powerful blender makes morning smoothies a breeze for a healthy and fast start. (15 words)
 
-      console.log('Calling Edge Function at:', apiUrl);
+Incorrect: Our blender makes great smoothies. (5 words)
 
-      const response = await fetch(apiUrl, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          prompt,
-          image_url,
-          max_tokens
-        })
-      });
+Incorrect: This powerful new blender is the best for making delicious and nutritious smoothies in the morning. (16 words)
 
-      console.log('Edge Function response status:', response.status);
+ROLE & OBJECTIVE
+You are an elite video creative director specializing in viral short-form content for social media marketing. Your task is to transform a user's simple prompt and product image into a comprehensive, production-ready Video Plan for a 30-second video that will create authentic, high-converting product videos that feel professionally produced and human-crafted, not AI-generated.
 
-      if (!response.ok) {
-        let errorData;
-        try {
-          errorData = await response.json();
-          console.error('Edge Function error response:', errorData);
-        } catch (parseError) {
-          console.error('Failed to parse error response:', parseError);
-          errorData = { error: 'Unknown error', details: await response.text() };
+INPUT PROCESSING & DEEP ANALYSIS
+INITIAL INPUT
+You will receive:
+
+A brief user prompt (may be minimal)
+A product image
+
+ANALYTICAL FRAMEWORK
+Before creating the video plan, conduct a deep analysis:
+
+A. PRODUCT PERSONALITY DECODING
+From the product image, identify:
+
+Product Category: [What it is]
+Value Proposition: [Core benefit it offers]
+Target Emotion: [How users should feel: empowered, relaxed, confident, excited, secure, indulgent]
+Brand Archetype: [Rebel, Hero, Innocent, Explorer, Sage, Lover, Jester, Caregiver, Creator, Ruler, Magician, Everyman]
+Price Perception: [Budget-friendly, mid-range, premium, luxury]
+Usage Context: [Daily essential, special occasion, problem-solver, lifestyle enhancer]
+
+B. USER INTENT INTERPRETATION
+Even from minimal input, extract:
+
+Explicit Request: [What they literally asked for]
+Implicit Desire: [What they really want to achieve]
+Emotional Goal: [How they want viewers to feel]
+Business Objective: [Awareness, conversion, retention, viral reach]
+Target Audience Hints: [Who they're trying to reach]
+Tone Preference: [Professional, playful, urgent, inspirational, educational]
+
+C. CONTEXTUAL INTELLIGENCE
+Consider:
+
+Product-Market Fit: [How this product serves its market]
+Cultural Moment: [Current trends/events that relate]
+Platform Psychology: [What works for this product type on social]
+Competitive Landscape: [How similar products are marketed]
+Seasonal Relevance: [Time-based factors]
+
+D. EMOTIONAL JOURNEY MAPPING
+Design a custom emotional arc based on the analysis:
+
+Opening Emotion: [What viewer feels in first 3 seconds]
+Tension Point: [The problem/desire at 6-12 seconds]
+Transformation: [The shift at 12-18 seconds]
+Satisfaction: [The payoff at 18-24 seconds]
+Final Feeling: [What lingers after 30 seconds]
+
+E. VIDEO VIBE IDENTIFICATION
+Analyze the user's request and product to determine the primary vibe:
+
+VIBE OPTIONS (choose ONE primary):
+
+LUXURY - Premium, sophisticated, exclusive, refined, aspirational
+FUN - Playful, lighthearted, joyful, colorful, upbeat
+ENERGETIC - Dynamic, powerful, intense, motivating, action-packed
+FUNNY - Humorous, witty, meme-worthy, unexpected, comedic
+
+VIBE DETECTION LOGIC:
+
+Product-Based Default Vibes:
+Jewelry, watches, perfume, designer bags → LUXURY
+Toys, games, candy, party supplies → FUN
+Sports equipment, energy drinks, fitness gear → ENERGETIC
+Novelty items, gag gifts, meme products → FUNNY
+
+If no clear signals:
+High-price products (>$500) → LUXURY
+Youth/teen products → FUN
+Performance products → ENERGETIC
+Entertainment products → FUNNY
+Default fallback → FUN (most versatile)
+
+IMPORTANT: The chosen vibe must be ONE of these four: LUXURY / FUN / ENERGETIC / FUNNY
+
+STYLE ADAPTATION MATRIX
+Based on your analysis and identified vibe, select the optimal approach:
+
+FOR LUXURY VIBE:
+Slower, deliberate pacing (1-2 cuts per scene)
+Elegant transitions (smooth fades, dissolves)
+Deep, rich color grading (blacks, golds, jewel tones)
+Minimal, elegant text (serif fonts, subtle animations)
+Orchestral, piano, or electronic ambient music
+Voiceover: Smooth, confident, sophisticated, measured pace
+
+FOR FUN VIBE:
+Quick, bouncy cuts (3-4 per scene)
+Pop transitions (zoom, bounce, slide)
+Bright, saturated colors (vibrant palette)
+Playful text animations (bubble fonts, motion graphics)
+Pop, tropical house, or upbeat instrumental
+Voiceover: Enthusiastic, friendly, excited, warm
+
+FOR ENERGETIC VIBE:
+Rapid cuts synced to beat (4-5 per scene)
+Dynamic transitions (glitch, shake, flash)
+High contrast, bold colors (reds, oranges, electric blues)
+Impact text (bold sans-serif, kinetic typography)
+EDM, trap, hip-hop, or rock music
+Voiceover: Powerful, urgent, motivating, commanding
+
+FOR FUNNY VIBE:
+Unexpected cut timing (comedic beats)
+Meme-style transitions (record scratch, freeze frame)
+Exaggerated colors or filters (oversaturated, distorted)
+Meme text style (Impact font, comic timing)
+Comedic sound effects, kazoo, or viral sounds
+Voiceover: Witty, sarcastic, deadpan, or exaggerated
+
+OUTPUT FORMAT
+Present the video plan in a clean, visually organized format:
+
+📦 PRODUCT TYPE
+[Single word: shoes, shirt, phone, car, watch, bag, cosmetics, food, toy, furniture, etc.]
+
+🎨 VIDEO VIBE
+[Must be ONE: LUXURY / FUN / ENERGETIC / FUNNY]
+
+🎬 VIDEO TITLE
+[Catchy internal reference name]
+
+📊 STRATEGIC ANALYSIS
+Product Personality: [What makes this product unique]
+Target Emotion: [Core feeling to evoke]
+Detected Intent: [What user really wants]
+Vibe Selection Rationale: [Why this specific vibe was chosen]
+Chosen Approach: [How this vibe will be executed]
+
+🎥 SCENE-BY-SCENE BREAKDOWN
+SCENE 1: HOOK ⏱️ [0:00-0:06]
+Visual: [Description]
+Voiceover: [Exactly 15 words - verified word count]
+
+SCENE 2: INTRIGUE ⏱️ [0:06-0:12]
+Visual: [Description]
+Voiceover: [Exactly 15 words - verified word count]
+
+SCENE 3: REVEAL ⏱️ [0:12-0:18]
+Visual: [The product solution/transformation]
+Voiceover: [Exactly 15 words - verified word count]
+
+SCENE 4: BENEFIT ⏱️ [0:18-0:24]
+Visual: [Showing product in use]
+Voiceover: [Exactly 15 words - verified word count]
+
+SCENE 5: PAYOFF ⏱️ [0:24-0:30]
+Visual: [Final shot embodying the vibe]
+Voiceover: [Exactly 15 words - verified word count]
+
+✅ READY FOR PRODUCTION
+30-second video plan complete and optimized for AI Agent execution`;
+
+      const messages = [
+        {
+          role: "system",
+          content: systemPrompt
+        },
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text: prompt
+            },
+            ...(image_url ? [{
+              type: "image_url",
+              image_url: {
+                url: image_url,
+                detail: "high"
+              }
+            }] : [])
+          ]
         }
-        
-        throw new Error(errorData.details || errorData.error || `API Error: ${response.status} ${response.statusText}`);
-      }
+      ];
 
-      const result = await response.json();
-      console.log('Edge Function success, response length:', result.response?.length || 0);
-      return result;
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o",
+        messages: messages,
+        max_tokens: max_tokens,
+        temperature: 0.7
+      });
+
+      return {
+        response: completion.choices[0].message.content,
+        usage: {
+          prompt_tokens: completion.usage.prompt_tokens,
+          completion_tokens: completion.usage.completion_tokens,
+          total_tokens: completion.usage.total_tokens
+        }
+      };
     } catch (error) {
-      console.error('Video Brief Generation Error:', error);
+      console.error('OpenAI API Error:', error);
       throw new Error(`Failed to generate brief: ${error.message}`);
     }
   },
@@ -60,101 +227,14 @@ export const Core = {
   },
   
   UploadFile: async ({ file }) => {
-    try {
-      // Validate file
-      if (!file) {
-        throw new Error('No file provided');
-      }
-      
-      // Check file size (max 10MB)
-      const maxSize = 5 * 1024 * 1024; // 5MB
-      if (file.size > maxSize) {
-        throw new Error('File size too large. Please use an image under 5MB.');
-      }
-      
-      // Compress image before converting to base64
-      const compressImage = (file, maxWidth = 800, quality = 0.7) => {
-        return new Promise((resolve, reject) => {
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          const img = new Image();
-          
-          img.onload = () => {
-            // Calculate new dimensions while maintaining aspect ratio
-            let { width, height } = img;
-            
-            if (width > maxWidth) {
-              height = (height * maxWidth) / width;
-              width = maxWidth;
-            }
-            
-            canvas.width = width;
-            canvas.height = height;
-            
-            // Draw and compress
-            ctx.drawImage(img, 0, 0, width, height);
-            
-            canvas.toBlob(
-              (blob) => {
-                if (blob) {
-                  resolve(blob);
-                } else {
-                  reject(new Error('Failed to compress image'));
-                }
-              },
-              'image/jpeg',
-              quality
-            );
-          };
-          
-          img.onerror = () => reject(new Error('Failed to load image for compression'));
-          img.src = URL.createObjectURL(file);
-        });
+    // Mock file upload - convert to base64 data URL for demo
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        resolve({ file_url: e.target.result });
       };
-      
-      // Compress the image first
-      const compressedBlob = await compressImage(file);
-      
-      // Check compressed size
-      if (compressedBlob.size > 150 * 1024) { // 150KB limit for compressed image
-        throw new Error('Image is too large even after compression. Please use a smaller image.');
-      }
-      
-      // Check file type
-      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
-      if (!allowedTypes.includes(file.type)) {
-        throw new Error('Invalid file type. Please upload a JPG or PNG image.');
-      }
-      
-      // Convert to base64 as fallback since storage bucket doesn't exist
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const base64String = reader.result;
-          
-          // Validate the base64 string length to ensure it fits in database URL field (500 chars max)
-          if (base64String.length > 450) { // Leave some margin for safety
-            reject(new Error('Compressed image is still too large. Please use a much smaller image.'));
-            return;
-          }
-          
-          console.log('File converted to base64, length:', base64String.length);
-          
-          resolve({ 
-            file_url: base64String,
-            success: true 
-          });
-        };
-        reader.onerror = () => {
-          reject(new Error('Failed to read file'));
-        };
-        reader.readAsDataURL(compressedBlob);
-      });
-      
-    } catch (error) {
-      console.error('File upload error:', error);
-      throw new Error(`File upload failed: ${error.message}`);
-    }
+      reader.readAsDataURL(file);
+    });
   },
   
   GenerateImage: async (data) => {

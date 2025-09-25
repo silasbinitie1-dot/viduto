@@ -94,11 +94,6 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
         throw new Error('Product image is required for brief generation');
       }
 
-      // Check if image URL is too long (likely base64)
-      if (image.length > 500) {
-        throw new Error('Image URL is too long. Please upload the image again - it may be corrupted.');
-      }
-
       console.log('Generating brief with OpenAI...', { prompt, image });
 
       // Call LLM to generate brief
@@ -112,10 +107,6 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
       console.log('OpenAI response received:', llmResponse);
 
       const generatedBrief = llmResponse.response;
-
-      if (!generatedBrief) {
-        throw new Error('No brief content received from AI');
-      }
 
       // Create assistant message with the brief
       const { Message } = await import('@/api/entities');
@@ -147,19 +138,7 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
 
     } catch (error) {
       console.error('Error generating brief:', error);
-      
-      // Provide more specific error messages
-      let errorMessage = 'Failed to generate video brief. Please try again.';
-      
-      if (error.message.includes('API key')) {
-        errorMessage = 'AI service configuration error. Please contact support.';
-      } else if (error.message.includes('too long')) {
-        errorMessage = 'Image file is too large. Please upload a smaller image.';
-      } else if (error.message.includes('401')) {
-        errorMessage = 'Authentication error with AI service. Please contact support.';
-      }
-      
-      toast.error(errorMessage);
+      toast.error('Failed to generate video brief. Please try again.');
       setShowGeneratingBrief(false);
     }
   };
@@ -197,65 +176,60 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
 
   // Handle brief approval and start production
   const handleApproveBrief = async () => {
+    // Check if user has enough credits before starting production
+    try {
+      const { User } = await import('@/api/entities');
+      const currentUser = await User.me();
+      if (!currentUser || currentUser.credits < 10) {
+        toast.error('Insufficient credits. You need 10 credits to start video production.');
+        return;
+      }
+    } catch (error) {
+      console.error('Error checking user credits:', error);
+      toast.error('Failed to verify credits. Please try again.');
+      return;
+    }
+
     try {
       setLoading(true);
 
-      // Find the initial user message with image URL
-      const initialMessage = messages.find(msg => 
-        msg.message_type === 'user' && msg.metadata?.image_url
-      );
-      
-      if (!initialMessage || !initialMessage.metadata?.image_url) {
-        toast.error('Product image not found. Please start a new project with an image.');
-        return;
-      }
-
-      // Validate image URL length
-      const imageUrl = initialMessage.metadata.image_url;
-      if (imageUrl && imageUrl.length > 500) {
-        toast.error('Image URL is too long. Please upload the image again.');
-        return;
-      }
-
-      // Call the production function with proper parameters
-      const { startVideoProduction } = await import('@/api/functions');
-      const result = await startVideoProduction({
-        chatId: chatId,
-        brief: currentBrief || briefText,
-        imageUrl: imageUrl,
-        creditsUsed: 10,
-        isRevision: false
+      // Call the production function
+      const { triggerInitialVideoWorkflow } = await import('@/api/functions');
+      await triggerInitialVideoWorkflow({ 
+        chat_id: chatId,
+        brief: currentBrief || briefText
       });
 
-      if (!result.success) {
-        throw new Error(result.message || 'Failed to start video production');
-      }
-
-      // Update local chat state
-      setCurrentChat(prev => ({
-        ...prev,
+      // Update chat state to production
+      const { Chat } = await import('@/api/entities');
+      await Chat.update(chatId, {
         workflow_state: 'in_production',
-        production_started_at: new Date().toISOString(),
-        active_video_id: result.database_video_id
+        production_started_at: new Date().toISOString()
+      });
+
+      setCurrentChat(prev => ({ 
+        ...prev, 
+        workflow_state: 'in_production',
+        production_started_at: new Date().toISOString()
       }));
 
-      // Add production tracking with the returned video_id
-      setProductionVideos(prev => new Map(prev).set(result.video_id, {
-        messageId: `production_${chatId}`,
+      // Add production tracking
+      const videoId = `video_${chatId}_${Date.now()}`;
+      setProductionVideos(prev => new Map(prev).set(videoId, {
+        messageId: `brief_${chatId}`,
         startedAt: Date.now(),
         chatId: chatId,
-        videoId: result.video_id,
-        databaseVideoId: result.database_video_id
+        videoId: videoId
       }));
 
       // Refresh credits
       onCreditsRefreshed?.();
 
-      toast.success('Video production started! This will take about 10-15 minutes.');
+      toast.success('Video production started! This will take about 10 minutes.');
 
     } catch (error) {
       console.error('Error starting production:', error);
-      toast.error(error.message || 'Failed to start video production. Please try again.');
+      toast.error('Failed to start video production. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -339,25 +313,9 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
       // Handle file upload if present
       let fileUrl = null;
       if (selectedFile) {
-        // Show upload progress
-        toast.loading('Uploading image...', { id: 'upload-progress' });
-        
         const { UploadFile } = await import('@/api/integrations');
-        try {
-          const uploadResult = await UploadFile({ file: selectedFile });
-          fileUrl = uploadResult.file_url;
-          
-          // Validate URL length after upload
-          if (fileUrl && fileUrl.length > 500) {
-            throw new Error('Generated file URL is too long. Please try uploading a different image.');
-          }
-          
-          toast.dismiss('upload-progress');
-          toast.success('Image uploaded successfully!');
-        } catch (uploadError) {
-          toast.dismiss('upload-progress');
-          throw new Error(`Image upload failed: ${uploadError.message}`);
-        }
+        const uploadResult = await UploadFile({ file: selectedFile });
+        fileUrl = uploadResult.file_url;
       }
 
       // Create user message
