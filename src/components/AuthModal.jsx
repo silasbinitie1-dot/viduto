@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { User } from '@/api/entities';
+import { supabase } from '@/lib/supabase';
 import { X } from 'lucide-react';
 import { toast } from "sonner";
 import Logo from "@/components/Logo";
@@ -21,12 +21,17 @@ export const AuthModal = ({ isOpen, onClose }) => {
             
             console.log('AuthModal - Starting Google OAuth login...');
             
-            // For Base44, redirect directly to OAuth endpoint
-            const baseUrl = window.location.origin;
-            const redirectUrl = `${baseUrl}/dashboard`;
+            // Use Supabase Google OAuth
+            const { error } = await supabase.auth.signInWithOAuth({
+                provider: 'google',
+                options: {
+                    redirectTo: `${window.location.origin}/dashboard`
+                }
+            });
             
-            // Redirect to Base44 Google OAuth
-            window.location.href = `/api/auth/google?redirect_url=${encodeURIComponent(redirectUrl)}`;
+            if (error) {
+                throw error;
+            }
         } catch (error) {
             console.error('Google login failed:', error);
             toast.error('Login failed. Please try again.');

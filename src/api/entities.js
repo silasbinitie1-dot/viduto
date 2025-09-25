@@ -195,16 +195,9 @@ export const User = {
   },
 
   login: async () => {
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${window.location.origin}/dashboard`
-      }
-    })
-    
-    if (error) {
-      throw new Error(`Login failed: ${error.message}`)
-    }
+    // This method is now handled directly in AuthModal component
+    // to avoid duplication and ensure proper error handling
+    throw new Error('Use AuthModal component for login')
   },
 
   logout: async () => {
