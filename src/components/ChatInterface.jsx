@@ -342,9 +342,6 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
         // Show upload progress
         toast.loading('Uploading image...', { id: 'upload-progress' });
         
-        // Show upload progress
-        toast.loading('Uploading image...', { id: 'upload-progress' });
-        
         const { UploadFile } = await import('@/api/integrations');
         try {
           const uploadResult = await UploadFile({ file: selectedFile });
