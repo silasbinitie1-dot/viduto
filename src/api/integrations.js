@@ -72,6 +72,54 @@ export const Core = {
         throw new Error('File size too large. Please use an image under 5MB.');
       }
       
+      // Compress image before converting to base64
+      const compressImage = (file, maxWidth = 800, quality = 0.7) => {
+        return new Promise((resolve, reject) => {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          const img = new Image();
+          
+          img.onload = () => {
+            // Calculate new dimensions while maintaining aspect ratio
+            let { width, height } = img;
+            
+            if (width > maxWidth) {
+              height = (height * maxWidth) / width;
+              width = maxWidth;
+            }
+            
+            canvas.width = width;
+            canvas.height = height;
+            
+            // Draw and compress
+            ctx.drawImage(img, 0, 0, width, height);
+            
+            canvas.toBlob(
+              (blob) => {
+                if (blob) {
+                  resolve(blob);
+                } else {
+                  reject(new Error('Failed to compress image'));
+                }
+              },
+              'image/jpeg',
+              quality
+            );
+          };
+          
+          img.onerror = () => reject(new Error('Failed to load image for compression'));
+          img.src = URL.createObjectURL(file);
+        });
+      };
+      
+      // Compress the image first
+      const compressedBlob = await compressImage(file);
+      
+      // Check compressed size
+      if (compressedBlob.size > 150 * 1024) { // 150KB limit for compressed image
+        throw new Error('Image is too large even after compression. Please use a smaller image.');
+      }
+      
       // Check file type
       const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
       if (!allowedTypes.includes(file.type)) {
@@ -84,9 +132,9 @@ export const Core = {
         reader.onload = () => {
           const base64String = reader.result;
           
-          // Validate the base64 string length to ensure it fits in database
-          if (base64String.length > 400000) { // ~300KB base64 = ~225KB file
-            reject(new Error('Image file is too large. Please use a smaller image (under 200KB).'));
+          // Validate the base64 string length to ensure it fits in database URL field (500 chars max)
+          if (base64String.length > 450) { // Leave some margin for safety
+            reject(new Error('Compressed image is still too large. Please use a much smaller image.'));
             return;
           }
           
@@ -100,7 +148,7 @@ export const Core = {
         reader.onerror = () => {
           reject(new Error('Failed to read file'));
         };
-        reader.readAsDataURL(file);
+        reader.readAsDataURL(compressedBlob);
       });
       
     } catch (error) {
