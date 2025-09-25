@@ -156,6 +156,19 @@ export default function Dashboard() {
       try {
         console.log('Dashboard - Initializing...');
         
+        // Check for auth session first
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error('Session error:', sessionError);
+          throw new Error('Session error');
+        }
+        
+        if (!session) {
+          console.log('No session found, redirecting to home');
+          throw new Error('Not authenticated');
+        }
+        
         const currentUser = await User.me();
         console.log('Dashboard - User authenticated:', currentUser.email);
         
