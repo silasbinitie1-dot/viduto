@@ -655,6 +655,22 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
                     </div>
                   </div>
                 )}
+
+                {/* Error Messages */}
+                {message.message_type === 'assistant' && message.metadata?.is_error && (
+                  <div className="flex justify-start">
+                    <div className={`max-w-[80%] rounded-2xl p-4 ${
+                      darkMode ? 'bg-red-900/20 border border-red-700' : 'bg-red-50 border border-red-200'
+                    }`}>
+                      <p className={`font-light ${darkMode ? 'text-red-300' : 'text-red-700'}`}>
+                        {message.content}
+                      </p>
+                      <p className={`text-xs mt-2 ${darkMode ? 'text-red-400' : 'text-red-500'}`}>
+                        {new Date(message.metadata.error_timestamp).toLocaleTimeString()}
+                      </p>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
 
