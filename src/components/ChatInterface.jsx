@@ -1,11 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Send, Upload, X, Plus, Loader2, Play, Edit3, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Chat, Message } from '@/api/entities';
-import { UploadFile, InvokeLLM } from '@/api/integrations';
 import { VideoPlayer } from './VideoPlayer';
 import ProductionProgress from './ProductionProgress';
-import { triggerInitialVideoWorkflow, triggerRevisionWorkflow } from '@/api/functions';
 import { toast } from "sonner";
 
 export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewChat, darkMode = false }) {
@@ -48,6 +45,8 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
 
       setChatLoading(true);
       try {
+        const { Chat, Message } = await import('@/api/entities');
+        
         const chat = await Chat.get(chatId);
         setCurrentChat(chat);
 
@@ -98,6 +97,7 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
       console.log('Generating brief with OpenAI...', { prompt, image });
 
       // Call LLM to generate brief
+      const { InvokeLLM } = await import('@/api/integrations');
       const llmResponse = await InvokeLLM({
         prompt: prompt,
         image_url: image,
@@ -109,8 +109,8 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
       const generatedBrief = llmResponse.response;
 
       // Create assistant message with the brief
-      const { Message: MessageEntity } = await import('@/api/entities');
-      const briefMessage = await MessageEntity.create({
+      const { Message } = await import('@/api/entities');
+      const briefMessage = await Message.create({
         chat_id: chat.id,
         message_type: 'assistant',
         content: generatedBrief,
@@ -121,8 +121,8 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
       });
 
       // Update chat state
-      const { Chat: ChatEntity } = await import('@/api/entities');
-      await ChatEntity.update(chat.id, {
+      const { Chat } = await import('@/api/entities');
+      await Chat.update(chat.id, {
         workflow_state: 'awaiting_approval',
         brief: generatedBrief
       });
@@ -140,8 +140,6 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
       console.error('Error generating brief:', error);
       toast.error('Failed to generate video brief. Please try again.');
       setShowGeneratingBrief(false);
-    } finally {
-      // Remove this as we handle it in try/catch blocks
     }
   };
 
@@ -154,8 +152,8 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
   const handleSaveBrief = async () => {
     try {
       // Update chat with new brief
-      const { Chat: ChatEntity } = await import('@/api/entities');
-      await ChatEntity.update(chatId, { brief: briefText });
+      const { Chat } = await import('@/api/entities');
+      await Chat.update(chatId, { brief: briefText });
 
       // Update local state without creating new message
       setCurrentBrief(briefText);
@@ -196,12 +194,14 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
       setLoading(true);
 
       // Call the production function
+      const { triggerInitialVideoWorkflow } = await import('@/api/functions');
       await triggerInitialVideoWorkflow({ 
         chat_id: chatId,
         brief: currentBrief || briefText
       });
 
       // Update chat state to production
+      const { Chat } = await import('@/api/entities');
       await Chat.update(chatId, {
         workflow_state: 'in_production',
         production_started_at: new Date().toISOString()
@@ -299,8 +299,8 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
 
       // Create new chat if none exists
       if (!currentChatId) {
-        const { Chat: ChatEntity } = await import('@/api/entities');
-        chat = await ChatEntity.create({
+        const { Chat } = await import('@/api/entities');
+        chat = await Chat.create({
           title: newMessage.trim() || 'Creating brief...',
           status: 'active',
           workflow_state: 'draft'
@@ -313,13 +313,14 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
       // Handle file upload if present
       let fileUrl = null;
       if (selectedFile) {
+        const { UploadFile } = await import('@/api/integrations');
         const uploadResult = await UploadFile({ file: selectedFile });
         fileUrl = uploadResult.file_url;
       }
 
       // Create user message
-      const { Message: MessageEntity } = await import('@/api/entities');
-      const userMessage = await MessageEntity.create({
+      const { Message } = await import('@/api/entities');
+      const userMessage = await Message.create({
         chat_id: currentChatId,
         message_type: 'user',
         content: newMessage.trim(),
@@ -329,11 +330,9 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
       // Update messages immediately
       setMessages(prev => [...prev, userMessage]);
 
-      // Show generating brief indicator immediately
-      if (isFirstMessage && fileUrl) {
-        setShowGeneratingBrief(true);
-      }
-
+      // Check if this is the first message with image
+      const isFirstMessage = messages.length === 0;
+      
       // Clear form
       setNewMessage('');
       setSelectedFile(null);
@@ -342,12 +341,14 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
       }
 
       // If this is the first message, trigger brief generation
-      const isFirstMessage = messages.length === 0;
       if (isFirstMessage && fileUrl) {
+        // Show generating brief indicator immediately
+        setShowGeneratingBrief(true);
         // Generate brief in background - don't await to avoid blocking UI
         generateVideoBrief([userMessage], chat, newMessage.trim(), fileUrl);
       } else {
         // This is a revision request
+        const { triggerRevisionWorkflow } = await import('@/api/functions');
         await triggerRevisionWorkflow({ 
           chat_id: currentChatId,
           message_id: userMessage.id 
@@ -376,6 +377,7 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
       });
       
       // Update chat state back to awaiting approval
+      const { Chat } = await import('@/api/entities');
       await Chat.update(chatId, {
         workflow_state: 'awaiting_approval',
         production_started_at: null
