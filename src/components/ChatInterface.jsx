@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Send, Upload, X, Plus, Loader2, Play, Edit3, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Chat, Message } from '@/api/entities';
+import { Chat, Message, User } from '@/api/entities';
 import { UploadFile, InvokeLLM } from '@/api/integrations';
 import { VideoPlayer } from './VideoPlayer';
 import ProductionProgress from './ProductionProgress';
@@ -179,7 +179,8 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
   const handleApproveBrief = async () => {
     // Check if user has enough credits before starting production
     try {
-      const currentUser = await User.me();
+      const { User: UserEntity } = await import('@/api/entities');
+      const currentUser = await UserEntity.me();
       if (!currentUser || currentUser.credits < 10) {
         toast.error('Insufficient credits. You need 10 credits to start video production.');
         return;
