@@ -19,6 +19,7 @@ export default function ProductionProgress({
     const [timeElapsed, setTimeElapsed] = useState(0);
     const [estimatedDuration] = useState(isRevision ? 5 * 60 * 1000 : 12 * 60 * 1000); // 5 or 12 minutes in ms
     const [videoStatus, setVideoStatus] = useState('processing');
+    const [statusMessage, setStatusMessage] = useState('Starting video production...');
     const [pollingActive, setPollingActive] = useState(true);
     
     // Polling for video status using the actual edge function
@@ -38,16 +39,19 @@ export default function ProductionProgress({
                 console.log('Status result:', statusResult);
                 
                 if (statusResult.status === 'completed' && statusResult.video_url) {
+                    setStatusMessage('Video completed successfully!');
                     setVideoStatus('completed');
                     setProgress(100);
                     setPollingActive(false);
                     toast.success('Video completed successfully!');
                     onVideoCompleted?.(statusResult.video_url);
                 } else if (statusResult.status === 'failed') {
+                    setStatusMessage('Video generation failed');
                     setVideoStatus('failed');
                     setPollingActive(false);
                     toast.error('Video generation failed');
                 } else {
+                    setStatusMessage('Creating your video...');
                     // Update progress from server
                     if (statusResult.progress !== undefined) {
                         setProgress(statusResult.progress);
@@ -57,6 +61,7 @@ export default function ProductionProgress({
                 }
             } catch (error) {
                 console.error('Error polling video status:', error);
+                setStatusMessage('Checking video status...');
                 // Don't mark as failed immediately - could be temporary network issue
                 // Only stop polling after multiple consecutive failures
             }
@@ -180,7 +185,7 @@ export default function ProductionProgress({
             <div className={`text-sm font-light ${
                 darkMode ? 'text-gray-300' : 'text-gray-700'
             }`}>
-                {getStatusMessage()}
+                {statusMessage}
             </div>
 
             {progress >= 99 && (

@@ -258,12 +258,16 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
       // Add production tracking
       const videoId = result.videoId || result.video_id || result.id;
       console.log('Adding production tracking for videoId:', videoId);
-      setProductionVideos(prev => new Map(prev).set(videoId, {
-        messageId: `brief_${chatId}`,
-        startedAt: Date.now(),
-        chatId: chatId,
-        videoId: videoId
-      }));
+      setProductionVideos(prev => {
+        const newMap = new Map();
+        newMap.set(videoId, {
+          messageId: `brief_${chatId}`,
+          startedAt: Date.now(),
+          chatId: chatId,
+          videoId: videoId
+        });
+        return newMap;
+      });
 
       // Refresh credits
       onCreditsRefreshed?.();
@@ -309,36 +313,24 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
 
   // Check for production videos
   useEffect(() => {
-    const checkProduction = () => {
-      const productionMap = new Map();
-      
-      messages.forEach(msg => {
-        if (msg.message_type === 'user' && msg.metadata?.video_production_started) {
-          const videoId = msg.metadata.video_id || `msg_${msg.id}`;
-          productionMap.set(videoId, {
-            messageId: msg.id,
-            startedAt: new Date(msg.metadata.video_production_started).getTime(),
+    // Only check for production videos if chat is in production state
+    // Don't override existing production tracking from handleApproveBrief
+    if (currentChat?.workflow_state === 'in_production' && productionVideos.size === 0) {
+      const videoId = currentChat?.active_video_id;
+      if (videoId && currentChat?.production_started_at) {
+        console.log('Setting up production tracking from chat state:', { videoId, chatId });
+        setProductionVideos(prev => {
+          const newMap = new Map();
+          newMap.set(videoId, {
+            messageId: `production_${videoId}`,
+            startedAt: new Date(currentChat.production_started_at).getTime(),
             chatId: chatId,
             videoId: videoId
           });
-        }
-      });
-
-      // Check if chat is in production state
-      if (currentChat?.workflow_state === 'in_production' && currentChat?.production_started_at) {
-        const videoId = currentChat?.active_video_id || crypto.randomUUID();
-        productionMap.set(videoId, {
-          messageId: currentChat?.active_video_id ? `production_${currentChat.active_video_id}` : `production_${chatId}`,
-          startedAt: new Date(currentChat.production_started_at).getTime(),
-          chatId: chatId,
-          videoId: videoId
+          return newMap;
         });
       }
-
-      setProductionVideos(productionMap);
-    };
-
-    checkProduction();
+    }
   }, [messages, chatId, currentChat]);
 
   const handleFileSelect = (e) => {
