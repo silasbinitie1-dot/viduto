@@ -22,6 +22,7 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
   const [currentBrief, setCurrentBrief] = useState(null);
   const [editingBrief, setEditingBrief] = useState(false);
   const [briefText, setBriefText] = useState('');
+  const [showGeneratingBrief, setShowGeneratingBrief] = useState(false);
   const fileInputRef = useRef(null);
   const messagesEndRef = useRef(null);
 
@@ -53,20 +54,11 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
         const chatMessages = await Message.filter({ chat_id: chatId }, 'created_at');
         setMessages(chatMessages || []);
 
-        // Set current brief from existing messages
+        // Set current brief from existing messages - only set once
         const briefMessage = chatMessages?.find(msg => msg.metadata?.is_brief);
         if (briefMessage) {
           setCurrentBrief(briefMessage.content);
           setBriefText(briefMessage.content);
-        } else {
-          // Only generate brief if none exists and we have an initial request
-          const hasInitialRequest = chatMessages?.some(msg => 
-            msg.message_type === 'user' && msg.metadata?.is_initial_request
-          );
-          
-          if (hasInitialRequest && chat.workflow_state === 'draft') {
-            await generateVideoBrief(chatMessages, chat);
-          }
         }
       } catch (error) {
         console.error('Error loading chat:', error);
@@ -81,7 +73,7 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
 
   // Generate video brief using AI
   const generateVideoBrief = async (chatMessages, chat, userPrompt = null, imageUrl = null) => {
-    setGeneratingBrief(true);
+    setShowGeneratingBrief(true);
     
     try {
       // Use provided parameters or find from messages
@@ -118,7 +110,7 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
 
       const generatedBrief = llmResponse.response;
 
-      // Create assistant message with the brief
+      // Create assistant message with the brief - only if one doesn't exist
       const briefMessage = await Message.create({
         chat_id: chat.id,
         message_type: 'assistant',
@@ -140,14 +132,16 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
       setCurrentBrief(generatedBrief);
       setBriefText(generatedBrief);
       setCurrentChat(prev => ({ ...prev, workflow_state: 'awaiting_approval', brief: generatedBrief }));
+      setShowGeneratingBrief(false);
 
       toast.success('Video brief generated! Review and approve to start production.');
 
     } catch (error) {
       console.error('Error generating brief:', error);
       toast.error('Failed to generate video brief. Please try again.');
+      setShowGeneratingBrief(false);
     } finally {
-      setGeneratingBrief(false);
+      // Remove this as we handle it in try/catch blocks
     }
   };
 
@@ -334,6 +328,11 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
       // Update messages immediately
       setMessages(prev => [...prev, userMessage]);
 
+      // Show generating brief indicator immediately
+      if (isFirstMessage && fileUrl) {
+        setShowGeneratingBrief(true);
+      }
+
       // Clear form
       setNewMessage('');
       setSelectedFile(null);
@@ -344,8 +343,8 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
       // If this is the first message, trigger brief generation
       const isFirstMessage = messages.length === 0;
       if (isFirstMessage && fileUrl) {
-        // Generate brief immediately for first message
-        await generateVideoBrief([userMessage], chat, newMessage.trim(), fileUrl);
+        // Generate brief in background - don't await to avoid blocking UI
+        generateVideoBrief([userMessage], chat, newMessage.trim(), fileUrl);
       } else {
         // This is a revision request
         await triggerRevisionWorkflow({ 
@@ -471,7 +470,7 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
                       darkMode ? 'bg-orange-600 text-white' : 'bg-orange-500 text-white'
                     }`}>
                       <p className="font-light">{message.content}</p>
-                      {message.metadata?.image_url && message.metadata?.is_initial_request && (
+                      {message.metadata?.image_url && (
                         <div className="mt-3">
                           <img
                             src={message.metadata.image_url}
@@ -486,7 +485,7 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
                 )}
 
                 {/* AI Brief Message */}
-                {message.message_type === 'assistant' && message.metadata?.is_brief && (
+                {message.message_type === 'assistant' && message.metadata?.is_brief && !showGeneratingBrief && (
                   <div className="flex justify-start">
                     <div className={`max-w-[90%] rounded-2xl p-6 ${
                       darkMode ? 'bg-gray-800 border border-gray-700' : 'bg-blue-50 border border-blue-200'
@@ -597,7 +596,7 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
             ))}
 
             {/* Brief Generation Loading */}
-            {generatingBrief && (
+            {showGeneratingBrief && (
               <div className="flex justify-start">
                 <div className={`max-w-[80%] rounded-2xl p-6 ${
                   darkMode ? 'bg-gray-800 border border-gray-700' : 'bg-blue-50 border border-blue-200'
@@ -676,7 +675,7 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
                       : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
                   }`}
                   rows={3}
-                  disabled={isSubmitting || generatingBrief}
+                  disabled={isSubmitting || showGeneratingBrief}
                 />
               </div>
               
@@ -703,7 +702,7 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
                     handleSubmit(new Event('submit'));
                   }}
                   size="icon"
-                  disabled={isSubmitting || generatingBrief}
+                  disabled={isSubmitting || showGeneratingBrief}
                   className={`w-10 h-10 ${
                     !newMessage.trim() 
                       ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
