@@ -339,9 +339,25 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
       // Handle file upload if present
       let fileUrl = null;
       if (selectedFile) {
+        // Show upload progress
+        toast.loading('Uploading image...', { id: 'upload-progress' });
+        
         const { UploadFile } = await import('@/api/integrations');
-        const uploadResult = await UploadFile({ file: selectedFile });
-        fileUrl = uploadResult.file_url;
+        try {
+          const uploadResult = await UploadFile({ file: selectedFile });
+          fileUrl = uploadResult.file_url;
+          
+          // Validate URL length after upload
+          if (fileUrl && fileUrl.length > 500) {
+            throw new Error('Generated file URL is too long. Please try uploading a different image.');
+          }
+          
+          toast.dismiss('upload-progress');
+          toast.success('Image uploaded successfully!');
+        } catch (uploadError) {
+          toast.dismiss('upload-progress');
+          throw new Error(`Image upload failed: ${uploadError.message}`);
+        }
       }
 
       // Create user message
