@@ -228,10 +228,38 @@ Voiceover: [Exactly 15 words - verified word count]
   
   UploadFile: async ({ file }) => {
     try {
+      if (!file || !(file instanceof File)) {
+        throw new Error('Invalid file provided')
+      }
+
+      // Check if bucket exists, create if it doesn't
+      const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets()
+      
+      if (!bucketsError) {
+        const bucketExists = buckets.some(bucket => bucket.name === 'public-files')
+        
+        if (!bucketExists) {
+          console.log('Creating public-files bucket...')
+          const { error: createBucketError } = await supabase.storage.createBucket('public-files', {
+            public: true,
+            allowedMimeTypes: ['image/jpeg', 'image/png', 'image/webp'],
+            fileSizeLimit: 52428800 // 50MB
+          })
+          
+          if (createBucketError) {
+            console.error('Failed to create bucket:', createBucketError)
+          }
+        }
+      }
+
       // Generate unique filename
       const fileExt = file.name.split('.').pop()
-      const fileName = `${Math.random().toString(36).substring(2)}.${fileExt}`
+      const timestamp = Date.now()
+      const randomString = Math.random().toString(36).substring(2)
+      const fileName = `${timestamp}_${randomString}.${fileExt}`
       const filePath = `uploads/${fileName}`
+
+      console.log('Uploading file:', { name: file.name, size: file.size, type: file.type })
 
       // Upload to Supabase Storage
       const { data, error } = await supabase.storage
@@ -239,13 +267,18 @@ Voiceover: [Exactly 15 words - verified word count]
         .upload(filePath, file)
 
       if (error) {
+        console.error('Supabase storage error:', error)
         throw new Error(`File upload failed: ${error.message}`)
       }
+
+      console.log('File uploaded successfully:', data)
 
       // Get public URL
       const { data: { publicUrl } } = supabase.storage
         .from('public-files')
         .getPublicUrl(filePath)
+
+      console.log('Generated public URL:', publicUrl)
 
       return { file_url: publicUrl }
     } catch (error) {

@@ -174,6 +174,7 @@ export default function Home() {
       } else {
         const { Chat } = await import('@/api/entities');
         const { Message } = await import('@/api/entities');
+        console.log('Uploading file:', { name: selectedFile.name, size: selectedFile.size, type: selectedFile.type });
         const { UploadFile } = await import('@/api/integrations');
 
         const newChat = await Chat.create({
@@ -192,6 +193,7 @@ export default function Home() {
         });
 
         sessionStorage.removeItem('pendingChatData');
+        console.log('Upload result:', uploadResult);
         navigate(`/dashboard?chat=${newChat.id}`);
       }
     } catch (error) {
