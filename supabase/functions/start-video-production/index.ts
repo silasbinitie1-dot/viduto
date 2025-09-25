@@ -28,7 +28,6 @@ Deno.serve(async (req: Request) => {
   try {
     console.log('🚀 start-video-production function called')
     console.log('📥 Request method:', req.method)
-    console.log('📥 Request headers:', Object.fromEntries(req.headers.entries()))
 
     // Initialize Supabase client
     const supabase = createClient(
@@ -46,7 +45,6 @@ Deno.serve(async (req: Request) => {
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
-    console.log('✅ Authorization header found:', authHeader.substring(0, 20) + '...')
 
     // Extract token from Bearer header
     const token = authHeader.replace('Bearer ', '')
@@ -64,12 +62,23 @@ Deno.serve(async (req: Request) => {
     console.log('✅ User authenticated:', user.id, user.email)
 
     const { chat_id, brief, image_url, is_revision = false, credits_used = 10 }: VideoProductionRequest = await req.json()
-    console.log('📥 Request payload:', { chat_id, brief: brief?.substring(0, 100) + '...', image_url, is_revision, credits_used })
+    
+    console.log('=== START VIDEO PRODUCTION ===')
+    console.log('User:', user.email)
+    console.log('Chat ID:', chat_id)
+    console.log('Credits Used:', credits_used)
+    console.log('Brief length:', brief?.length || 0)
+    console.log('Image URL:', image_url)
+    console.log('Is Revision:', is_revision)
 
     if (!chat_id || !brief) {
       console.log('❌ Missing required fields:', { chat_id: !!chat_id, brief: !!brief })
       return new Response(
-        JSON.stringify({ success: false, error: 'Missing required fields: chat_id and brief' }),
+        JSON.stringify({ 
+          success: false, 
+          error: 'Missing required parameters',
+          required: ['chat_id', 'brief']
+        }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -93,15 +102,11 @@ Deno.serve(async (req: Request) => {
     if (chat.user_id !== user.id) {
       console.log('❌ Chat ownership mismatch:', { chat_user_id: chat.user_id, user_id: user.id })
       return new Response(
-        JSON.stringify({ success: false, error: 'Chat not found or access denied' }),
+        JSON.stringify({ success: false, error: 'Chat not found or unauthorized' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
     console.log('✅ Chat ownership verified')
-
-    // Generate unique video ID
-    const video_id = crypto.randomUUID()
-    console.log('🆔 Generated video_id:', video_id)
 
     // Get user profile and check credits
     console.log('💳 Fetching user profile for credit check...')
@@ -120,7 +125,7 @@ Deno.serve(async (req: Request) => {
     }
     console.log('✅ User profile found:', { credits: userProfile.credits, email: userProfile.email })
 
-    if (userProfile.credits < credits_used) {
+    if ((userProfile.credits || 0) < credits_used) {
       console.log('❌ Insufficient credits:', { available: userProfile.credits, required: credits_used })
       return new Response(
         JSON.stringify({ success: false, error: 'Insufficient credits' }),
@@ -129,98 +134,26 @@ Deno.serve(async (req: Request) => {
     }
     console.log('✅ Credits check passed')
 
-    // Call the actual N8N webhook for video production
-    const webhookUrl = 'https://viduto.app.n8n.cloud/webhook/video-production'
-    console.log('🔗 Calling N8N webhook:', webhookUrl)
-    
-    const webhookPayload = {
-      video_id: video_id,
-      chat_id: chat_id,
-      user_id: user.id,
-      user_email: user.email,
-      prompt: brief.length > 1000 ? brief.substring(0, 1000) : brief,
-      image_url: image_url,
-      is_revision: is_revision,
-      credits_used: credits_used,
-      webhook_callback_url: `${Deno.env.get('SUPABASE_URL')}/functions/v1/n8n-video-callback`
-    }
-    console.log('📤 Webhook payload:', webhookPayload)
+    // Generate unique video ID
+    const timestamp = Date.now()
+    const video_id = `video_${chat_id}_${timestamp}`
+    console.log('🆔 Generated video_id:', video_id)
 
-    try {
-      const webhookResponse = await fetch(webhookUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(webhookPayload)
-      })
-
-      console.log('📡 Webhook response status:', webhookResponse.status, webhookResponse.statusText)
-
-      if (!webhookResponse.ok) {
-        const errorText = await webhookResponse.text()
-        console.log('❌ Webhook response error body:', errorText)
-        throw new Error(`Webhook failed with status: ${webhookResponse.status}`)
-      }
-
-      console.log('✅ Webhook called successfully')
-    } catch (webhookError) {
-      console.error('❌ Webhook call failed:', webhookError.message)
-      console.error('❌ Full webhook error:', webhookError)
-      
-      // Refund credits since webhook failed
-      console.log('💰 Refunding credits due to webhook failure...')
-      await supabase
-        .from('users')
-        .update({ credits: userProfile.credits })
-        .eq('id', user.id)
-      
-      // Mark video as failed
-      console.log('📝 Marking video as failed due to webhook failure...')
-      await supabase
-        .from('video')
-        .update({
-          status: 'failed',
-          error_message: `Webhook failed: ${webhookError.message}`,
-          processing_completed_at: new Date().toISOString()
-        })
-        .eq('id', video_id)
-      
-      return new Response(
-        JSON.stringify({ success: false, error: 'Failed to start video production. Credits have been refunded.' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-    
-    // Deduct credits
-    console.log('💳 Deducting credits:', { from: userProfile.credits, amount: credits_used, remaining: userProfile.credits - credits_used })
-    const { error: creditError } = await supabase
-      .from('users')
-      .update({ credits: userProfile.credits - credits_used })
-      .eq('id', user.id)
-
-    if (creditError) {
-      console.log('❌ Credit deduction failed:', creditError.message)
-      return new Response(
-        JSON.stringify({ success: false, error: 'Failed to process payment. Please try again.' }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-    console.log('✅ Credits deducted successfully')
-
-    // Create video record
-    console.log('📝 Creating video record...')
+    // Create video record IMMEDIATELY before starting N8N workflow
+    console.log('📝 Creating video record in database...')
     const videoRecord = {
-      id: video_id,
+      id: crypto.randomUUID(),
       chat_id: chat_id,
+      video_id: video_id,
       prompt: brief.length > 1000 ? brief.substring(0, 1000) : brief,
       image_url: image_url,
       status: 'processing',
       credits_used: credits_used,
       processing_started_at: new Date().toISOString(),
+      idempotency_key: `${chat_id}_${timestamp}`,
+      retry_count: 0,
       is_revision: is_revision
     }
-    console.log('📝 Video record to insert:', videoRecord)
 
     const { data: video, error: videoError } = await supabase
       .from('video')
@@ -230,20 +163,31 @@ Deno.serve(async (req: Request) => {
 
     if (videoError) {
       console.log('❌ Video record creation failed:', videoError.message)
-      console.log('❌ Full video error:', videoError)
-      // Refund credits since video creation failed
-      console.log('💰 Refunding credits due to video creation failure...')
-      await supabase
-        .from('users')
-        .update({ credits: userProfile.credits })
-        .eq('id', user.id)
-      
       return new Response(
-        JSON.stringify({ success: false, error: 'Failed to initialize video production. Credits have been refunded.' }),
+        JSON.stringify({ success: false, error: 'Failed to initialize video production' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
     console.log('✅ Video record created successfully:', video.id)
+
+    // Deduct credits
+    console.log('💳 Deducting credits:', { from: userProfile.credits, amount: credits_used, remaining: userProfile.credits - credits_used })
+    const newCredits = (userProfile.credits || 0) - credits_used
+    const { error: creditError } = await supabase
+      .from('users')
+      .update({ credits: newCredits })
+      .eq('id', user.id)
+
+    if (creditError) {
+      console.log('❌ Credit deduction failed:', creditError.message)
+      // Rollback video record
+      await supabase.from('video').delete().eq('id', video.id)
+      return new Response(
+        JSON.stringify({ success: false, error: 'Failed to process payment. Please try again.' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+    console.log('✅ Credits deducted successfully')
 
     // Update chat state
     console.log('💬 Updating chat state...')
@@ -251,10 +195,119 @@ Deno.serve(async (req: Request) => {
       .from('chat')
       .update({
         workflow_state: 'in_production',
+        active_video_id: video_id,
         production_started_at: new Date().toISOString()
       })
       .eq('id', chat_id)
     console.log('✅ Chat state updated successfully')
+
+    // Get webhook URL from environment
+    const webhookUrl = Deno.env.get('N8N_INITIAL_VIDEO_WEBHOOK_URL')
+    if (!webhookUrl) {
+      console.error('❌ N8N_INITIAL_VIDEO_WEBHOOK_URL not configured')
+      
+      // Rollback changes
+      await supabase.from('users').update({ credits: userProfile.credits }).eq('id', user.id)
+      await supabase.from('chat').update({ workflow_state: 'awaiting_approval', active_video_id: null }).eq('id', chat_id)
+      await supabase.from('video').update({ status: 'failed', error_message: 'N8N webhook URL not configured' }).eq('id', video.id)
+      
+      return new Response(
+        JSON.stringify({ success: false, error: 'N8N webhook URL not configured' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+    console.log('🔗 Webhook URL found:', webhookUrl)
+
+    // Prepare N8N webhook payload
+    const webhookPayload = {
+      video_id: video_id,
+      chat_id: chat_id,
+      user_id: user.id,
+      user_email: user.email,
+      user_name: userProfile.full_name || user.email,
+      prompt: brief,
+      image_url: image_url,
+      is_revision: is_revision,
+      request_timestamp: new Date().toISOString(),
+      source: "Viduto",
+      version: "1.0",
+      callback_url: `${Deno.env.get('SUPABASE_URL')}/functions/v1/n8n-video-callback`
+    }
+
+    console.log('📤 N8N webhook payload:', JSON.stringify(webhookPayload, null, 2))
+
+    // Trigger N8N workflow
+    console.log('🔗 Calling N8N webhook:', webhookUrl)
+    try {
+      const n8nResponse = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'User-Agent': 'Viduto-App/1.0',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(webhookPayload)
+      })
+
+      console.log('📡 N8N response status:', n8nResponse.status, n8nResponse.statusText)
+      const responseText = await n8nResponse.text()
+      console.log('📡 N8N response text:', responseText)
+
+      if (!n8nResponse.ok) {
+        console.error('❌ N8N webhook failed with status:', n8nResponse.status)
+        console.error('❌ N8N webhook error:', responseText)
+        
+        // Rollback: refund credits and reset chat state
+        console.log('🔄 Rolling back due to N8N webhook failure...')
+        await supabase.from('users').update({ credits: userProfile.credits }).eq('id', user.id)
+        await supabase.from('chat').update({
+          workflow_state: 'awaiting_approval',
+          active_video_id: null
+        }).eq('id', chat_id)
+        await supabase.from('video').update({
+          status: 'failed',
+          error_message: `N8N webhook failed: ${responseText}`,
+          processing_completed_at: new Date().toISOString()
+        }).eq('id', video.id)
+        
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: 'Failed to start video production. Credits have been refunded.',
+            details: responseText
+          }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      console.log('✅ N8N workflow started successfully:', responseText)
+
+    } catch (webhookError) {
+      console.error('❌ Webhook call failed:', webhookError.message)
+      console.error('❌ Full webhook error:', webhookError)
+      
+      // Rollback changes
+      console.log('🔄 Rolling back due to webhook call failure...')
+      await supabase.from('users').update({ credits: userProfile.credits }).eq('id', user.id)
+      await supabase.from('chat').update({
+        workflow_state: 'awaiting_approval',
+        active_video_id: null
+      }).eq('id', chat_id)
+      await supabase.from('video').update({
+        status: 'failed',
+        error_message: `Webhook failed: ${webhookError.message}`,
+        processing_completed_at: new Date().toISOString()
+      }).eq('id', video.id)
+      
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Failed to start video production. Credits have been refunded.',
+          details: webhookError.message
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
 
     // Log successful start
     console.log('📊 Creating system log entry...')
@@ -263,7 +316,7 @@ Deno.serve(async (req: Request) => {
       .insert({
         operation: is_revision ? 'video_revision_started' : 'video_production_started',
         entity_type: 'video',
-        entity_id: video_id,
+        entity_id: video.id,
         user_email: user.email,
         status: 'success',
         message: `Video ${is_revision ? 'revision' : 'production'} started successfully`,
@@ -287,7 +340,8 @@ Deno.serve(async (req: Request) => {
         video_id: video_id,
         message: `Video ${is_revision ? 'revision' : 'production'} started successfully`,
         estimated_completion: new Date(Date.now() + (is_revision ? 5 : 12) * 60 * 1000).toISOString(),
-        webhook_called: true
+        webhook_called: true,
+        credits_remaining: newCredits
       }),
       {
         status: 200,
