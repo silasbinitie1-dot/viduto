@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Send, Upload, X, Plus, Loader2, Play, Edit3, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { supabase } from '@/lib/supabase';
 import { VideoPlayer } from './VideoPlayer';
 import ProductionProgress from './ProductionProgress';
 import { toast } from "sonner";
