@@ -126,6 +126,63 @@ export const Core = {
       throw new Error(`File upload failed: ${error.message}`);
     }
   },
+      const maxSize = 10 * 1024 * 1024; // 10MB
+      if (file.size > maxSize) {
+        throw new Error('File size too large. Please use an image under 10MB.');
+      }
+      
+      // Check file type
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+      if (!allowedTypes.includes(file.type)) {
+        throw new Error('Invalid file type. Please upload a JPG or PNG image.');
+      }
+      
+      // Generate unique filename
+      const fileExt = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+      const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
+      const filePath = `uploads/${fileName}`;
+      
+      console.log('Uploading file to Supabase Storage:', {
+        fileName,
+        fileSize: file.size,
+        fileType: file.type
+      });
+      
+      // Upload to Supabase Storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('public-files')
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+      
+      if (uploadError) {
+        console.error('Supabase upload error:', uploadError);
+        throw new Error(`Upload failed: ${uploadError.message}`);
+      }
+      
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('public-files')
+        .getPublicUrl(filePath);
+      
+      if (!urlData?.publicUrl) {
+        throw new Error('Failed to get public URL for uploaded file');
+      }
+      
+      console.log('File uploaded successfully:', urlData.publicUrl);
+      
+      return { 
+        file_url: urlData.publicUrl,
+        file_path: filePath,
+        success: true 
+      };
+      
+    } catch (error) {
+      console.error('File upload error:', error);
+      throw new Error(`File upload failed: ${error.message}`);
+    }
+  },
   
   GenerateImage: async (data) => {
     // For demo purposes, return a placeholder
