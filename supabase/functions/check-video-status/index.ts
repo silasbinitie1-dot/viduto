@@ -82,8 +82,12 @@ Deno.serve(async (req: Request) => {
       .eq('chat_id', chatId)
       .single()
 
+    console.log('Looking for video with video_id:', videoId, 'in chat:', chatId)
+    console.log('Video query result:', { video: video?.id, error: videoError?.message })
+
     // If not found by video_id, try by UUID (in case videoId is actually the UUID)
     if (videoError && videoError.code === 'PGRST116') {
+      console.log('Video not found by video_id, trying by UUID...')
       const { data: videoByUuid, error: uuidError } = await supabase
         .from('video')
         .select('*')
@@ -92,23 +96,34 @@ Deno.serve(async (req: Request) => {
         .single()
       
       if (!uuidError && videoByUuid) {
+        console.log('Found video by UUID:', videoByUuid.id)
         video = videoByUuid
         videoError = null
+      } else {
+        console.log('Video not found by UUID either:', uuidError?.message)
       }
     }
 
     if (videoError || !video) {
+      console.log('Final video lookup failed:', { videoError: videoError?.message, hasVideo: !!video })
       return new Response(
         JSON.stringify({ success: false, error: 'Video not found' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
+    console.log('Video found successfully:', { 
+      id: video.id, 
+      video_id: video.video_id, 
+      status: video.status,
+      processing_started_at: video.processing_started_at 
+    })
+
     // Update last status check
     await supabase
       .from('video')
       .update({ last_status_check: new Date().toISOString() })
-      .eq('video_id', videoId)
+      .eq('id', video.id)
 
     // Check for timeout (15 minutes)
     const processingStarted = new Date(video.processing_started_at).getTime()

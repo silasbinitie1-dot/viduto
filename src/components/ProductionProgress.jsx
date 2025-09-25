@@ -27,11 +27,15 @@ export default function ProductionProgress({
         
         const pollStatus = async () => {
             try {
+                console.log('Polling video status for:', { videoId, chatId });
+                
                 const { checkVideoStatus } = await import('@/api/functions');
                 const statusResult = await checkVideoStatus({
                     videoId: videoId,
                     chatId: chatId
                 });
+                
+                console.log('Status result:', statusResult);
                 
                 if (statusResult.status === 'completed' && statusResult.video_url) {
                     setVideoStatus('completed');
@@ -48,19 +52,22 @@ export default function ProductionProgress({
                     if (statusResult.progress !== undefined) {
                         setProgress(statusResult.progress);
                     }
+                    // Ensure we stay in processing state
+                    setVideoStatus('processing');
                 }
             } catch (error) {
                 console.error('Error polling video status:', error);
-                // Continue polling even if there's an error
+                // Don't mark as failed immediately - could be temporary network issue
+                // Only stop polling after multiple consecutive failures
             }
         };
         
         // Poll immediately, then every 10 seconds
         pollStatus();
-        const pollInterval = setInterval(pollStatus, 10000);
+        const pollInterval = setInterval(pollStatus, 15000); // Poll every 15 seconds
         
         return () => clearInterval(pollInterval);
-    }, [pollingActive, onVideoCompleted]);
+    }, [pollingActive, onVideoCompleted, videoId, chatId]);
 
     useEffect(() => {
         if (!pollingActive) return;
@@ -88,11 +95,11 @@ export default function ProductionProgress({
 
     const getStatusMessage = () => {
         if (videoStatus === 'processing') {
-            const estimateSeconds = estimatedDuration; // 5 or 12 minutes
+            const estimateSeconds = estimatedDuration / 1000; // Convert to seconds
             
-            if (timeElapsed * 1000 < estimateSeconds) {
-                const remaining = estimateSeconds - (timeElapsed * 1000);
-                const remainingMinutes = Math.ceil(remaining / 60000);
+            if (timeElapsed < estimateSeconds) {
+                const remaining = estimateSeconds - timeElapsed;
+                const remainingMinutes = Math.ceil(remaining / 60);
                 return `Creating your ${isRevision ? 'revised ' : ''}video... About ${remainingMinutes} minutes remaining`;
             } else {
                 return `Finalizing your ${isRevision ? 'revised ' : ''}video... Almost ready!`;
