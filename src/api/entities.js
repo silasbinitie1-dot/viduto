@@ -158,21 +158,18 @@ export const Video = {
 
 export const User = {
   me: async () => {
-    // First check if we have a session
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    // Get current user from Supabase auth
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
     
-    if (sessionError) {
-      console.error('Session error:', sessionError)
-      throw new Error('Session error')
+    if (authError) {
+      console.error('Auth error:', authError)
+      throw new Error('Authentication failed')
     }
     
-    if (!session?.user) {
+    if (!user) {
       throw new Error('Not authenticated')
     }
     
-    const user = session.user
-    
-
     // Get user profile from users table
     const { data: profile, error: profileError } = await supabase
       .from('users')
