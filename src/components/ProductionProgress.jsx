@@ -87,12 +87,12 @@ export default function ProductionProgress({
 
     const getStatusMessage = () => {
         if (videoStatus === 'processing') {
-            const estimateSeconds = estimateMinutes * 60;
+            const estimateSeconds = 30; // 30 seconds for demo
             
             if (timeElapsed < estimateSeconds) {
                 const remaining = estimateSeconds - timeElapsed;
-                const remainingMinutes = Math.ceil(remaining / 60);
-                return `Creating your ${isRevision ? 'revised ' : ''}video... About ${remainingMinutes} min${remainingMinutes !== 1 ? 's' : ''} remaining`;
+                const remainingSeconds = Math.ceil(remaining / 1000);
+                return `Creating your ${isRevision ? 'revised ' : ''}video... About ${remainingSeconds} seconds remaining (demo mode)`;
             } else {
                 return `Finalizing your ${isRevision ? 'revised ' : ''}video... Almost ready!`;
             }
@@ -182,7 +182,7 @@ export default function ProductionProgress({
                     <p className={`text-sm ${
                         darkMode ? 'text-orange-300' : 'text-orange-700'
                     }`}>
-                        🎬 Your video is being processed in the final stage. It will appear automatically once ready.
+                        🎬 Your demo video is almost ready! It will appear automatically in a few seconds.
                     </p>
                 </div>
             )}

@@ -234,7 +234,7 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
       // Refresh credits
       onCreditsRefreshed?.();
 
-      toast.success('Video production started! This will take about 10 minutes.');
+      toast.success('Video production started! This will take about 30 seconds (demo mode).');
 
     } catch (error) {
       console.error('Error starting production:', error);
@@ -392,28 +392,42 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
         // Generate brief in background - don't await to avoid blocking UI
         generateVideoBrief([userMessage], chat, newMessage.trim(), fileUrl);
       } else {
-        // This is a revision request
-        const { triggerRevisionWorkflow } = await import('@/api/functions');
-        const result = await triggerRevisionWorkflow({ 
-          chat_id: currentChatId,
-          message_id: userMessage.id 
-        });
-        
-        console.log('Revision workflow started:', result);
+        // This is a revision request - simulate for demo
+        const revisionVideoId = `revision_${Date.now()}`;
         
         // Add production tracking for revision
-        if (result.video_id) {
-          setProductionVideos(prev => new Map(prev).set(result.video_id, {
-            messageId: userMessage.id,
-            startedAt: Date.now(),
-            chatId: currentChatId,
-            videoId: result.video_id,
-            isRevision: true
-          }));
-        }
+        setProductionVideos(prev => new Map(prev).set(revisionVideoId, {
+          messageId: userMessage.id,
+          startedAt: Date.now(),
+          chatId: currentChatId,
+          videoId: revisionVideoId,
+          isRevision: true
+        }));
         
-        onCreditsRefreshed?.();
-        toast.success('Video revision started! This will take about 5 minutes.');
+        // Simulate revision completion after 30 seconds
+        setTimeout(async () => {
+          try {
+            const { Message } = await import('@/api/entities');
+            await Message.create({
+              chat_id: currentChatId,
+              message_type: 'assistant',
+              content: '🎬 Your revised video is ready!',
+              metadata: {
+                video_completed: true,
+                video_url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+                video_id: revisionVideoId,
+                is_revision: true
+              }
+            });
+            
+            // Trigger video completion handler
+            handleVideoCompleted('https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4');
+          } catch (error) {
+            console.error('Error in demo revision completion:', error);
+          }
+        }, 30000);
+        
+        toast.success('Video revision started! This will take about 30 seconds (demo mode).');
       }
 
     } catch (error) {
