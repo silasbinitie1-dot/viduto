@@ -156,34 +156,14 @@ export default function Dashboard() {
       try {
         console.log('Dashboard - Initializing...');
         
-        // Check if user is authenticated first
-        const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
-        
-        if (authError || !authUser) {
-          console.log('Dashboard - No authenticated user, redirecting...');
-          setAuthError(true);
-          setTimeout(() => navigate('/'), 1000);
-          return;
-        }
-        
-        console.log('Dashboard - User authenticated:', authUser.email);
-        
-        // Now get the user profile
+        // Try to get user profile directly - this will handle auth check internally
         const currentUser = await User.me();
         
         setUser(currentUser);
         setUserCredits(currentUser.credits || 0);
         setAuthError(false);
         
-        console.log('Dashboard - Authentication successful');
-        
-        // Skip Stripe sync for now to avoid blocking
-        // await syncUserWithStripe();
-
-        // This ensures new users or users with 0 credits get their initial credits if applicable
-        // if (currentUser.credits == null || currentUser.credits === 0) {
-        //   await ensureCredits();
-        // }
+        console.log('Dashboard - Authentication successful:', currentUser);
 
         if (window.fbq) {
           window.fbq('track', 'CompleteRegistration');
@@ -255,20 +235,21 @@ export default function Dashboard() {
         }
       } catch (e) {
         console.error('Initialization failed:', e);
-        setAuthError(true);
-        setTimeout(() => navigate('/'), 1000);
+        // If it's an auth error, redirect to home
+        if (e.message?.includes('Not authenticated') || e.message?.includes('Invalid token')) {
+          console.log('Dashboard - Authentication failed, redirecting...');
+          setAuthError(true);
+          setTimeout(() => navigate('/'), 1000);
+        } else {
+          // For other errors, show them but don't redirect
+          console.error('Dashboard - Non-auth error:', e);
+          setAuthError(false);
+        }
       } finally {
         setLoading(false);
       }
     };
     initialize();
-
-    // Skip automatic refresh for now
-    // const creditsInterval = setInterval(refreshUserCredits, 30000);
-
-    // return () => {
-    //   clearInterval(creditsInterval);
-    // };
   }, [navigate, refreshUserCredits, ensureCredits]);
 
   // Skip visibility change refresh for now

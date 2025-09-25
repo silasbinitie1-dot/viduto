@@ -161,8 +161,11 @@ export const User = {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     
     if (authError || !user) {
-      throw new Error('Not authenticated')
+      console.log('User.me - Auth check failed:', authError?.message || 'No user')
+      throw new Error(`Not authenticated: ${authError?.message || 'No user session'}`)
     }
+
+    console.log('User.me - Auth successful for:', user.email)
 
     // Get user profile from users table
     const { data: profile, error: profileError } = await supabase
@@ -173,7 +176,7 @@ export const User = {
 
     if (profileError) {
       // If profile doesn't exist, return a default profile
-      console.log('User profile not found, creating default profile...');
+      console.log('User.me - Profile not found, returning default profile for:', user.email);
       return {
         id: user.id,
         email: user.email,
@@ -184,6 +187,7 @@ export const User = {
       };
     }
 
+    console.log('User.me - Profile found:', profile.email, 'Credits:', profile.credits)
     return profile
   },
 
