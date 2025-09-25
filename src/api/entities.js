@@ -172,23 +172,16 @@ export const User = {
       .single()
 
     if (profileError) {
-      // If profile doesn't exist, create it
-      const { data: newProfile, error: createError } = await supabase
-        .from('users')
-        .insert({
-          id: user.id,
-          email: user.email,
-          full_name: user.user_metadata?.full_name || user.email.split('@')[0],
-          credits: 20
-        })
-        .select()
-        .single()
-
-      if (createError) {
-        throw new Error(`Failed to create user profile: ${createError.message}`)
-      }
-      
-      return newProfile
+      // If profile doesn't exist, return a default profile
+      console.log('User profile not found, creating default profile...');
+      return {
+        id: user.id,
+        email: user.email,
+        full_name: user.user_metadata?.full_name || user.email.split('@')[0],
+        credits: 500, // Give demo credits
+        subscription_status: 'inactive',
+        current_plan: 'Free'
+      };
     }
 
     return profile

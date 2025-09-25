@@ -156,20 +156,34 @@ export default function Dashboard() {
       try {
         console.log('Dashboard - Initializing...');
         
+        // Check if user is authenticated first
+        const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+        
+        if (authError || !authUser) {
+          console.log('Dashboard - No authenticated user, redirecting...');
+          setAuthError(true);
+          setTimeout(() => navigate('/'), 1000);
+          return;
+        }
+        
+        console.log('Dashboard - User authenticated:', authUser.email);
+        
+        // Now get the user profile
         const currentUser = await User.me();
-        console.log('Dashboard - User authenticated:', currentUser.email);
         
         setUser(currentUser);
         setUserCredits(currentUser.credits || 0);
         setAuthError(false);
         
-        console.log('Dashboard - Authentication successful, syncing with Stripe...');
-        await syncUserWithStripe();
+        console.log('Dashboard - Authentication successful');
+        
+        // Skip Stripe sync for now to avoid blocking
+        // await syncUserWithStripe();
 
         // This ensures new users or users with 0 credits get their initial credits if applicable
-        if (currentUser.credits == null || currentUser.credits === 0) {
-          await ensureCredits();
-        }
+        // if (currentUser.credits == null || currentUser.credits === 0) {
+        //   await ensureCredits();
+        // }
 
         if (window.fbq) {
           window.fbq('track', 'CompleteRegistration');
@@ -188,24 +202,8 @@ export default function Dashboard() {
                 window.fbq('track', 'Purchase', { value: 0.01, currency: 'USD' });
             }
             
-            // רענן נתונים מספר פעמים כדי לוודא שהwebhook עודכן
-            const refreshAfterPayment = async () => {
-                let attempts = 0;
-                const maxAttempts = 10; // Changed from 15 to 10
-                
-                const intervalId = setInterval(async () => {
-                    attempts++;
-                    console.log(`🔄 Post-payment refresh attempt ${attempts}/${maxAttempts}`);
-                    await refreshUserCredits(); // Ensure Stripe sync is part of this refresh
-                    
-                    if (attempts >= maxAttempts) {
-                        clearInterval(intervalId);
-                        console.log('✅ Completed post-payment refresh attempts');
-                    }
-                }, 3000); // Changed from 2000ms to 3000ms
-            };
-            
-            refreshAfterPayment();
+            // Skip post-payment refresh for now
+            // refreshAfterPayment();
             
             window.history.replaceState({}, document.title, "/dashboard");
         }
@@ -256,11 +254,7 @@ export default function Dashboard() {
            }
         }
       } catch (e) {
-        if (e.message === 'Not authenticated') {
-          console.info('User not authenticated, redirecting to home page');
-        } else {
-          console.error('Initialization failed:', e);
-        }
+        console.error('Initialization failed:', e);
         setAuthError(true);
         setTimeout(() => navigate('/'), 1000);
       } finally {
@@ -269,28 +263,28 @@ export default function Dashboard() {
     };
     initialize();
 
-    // 🔄 תיקון: קיצור זמן רענון לתדירות גבוהה יותר אחרי תשלום
-    const creditsInterval = setInterval(refreshUserCredits, 30000); // כל 30 שניות
+    // Skip automatic refresh for now
+    // const creditsInterval = setInterval(refreshUserCredits, 30000);
 
-    return () => {
-      clearInterval(creditsInterval);
-    };
+    // return () => {
+    //   clearInterval(creditsInterval);
+    // };
   }, [navigate, refreshUserCredits, ensureCredits]);
 
-  // רענון נתונים כאשר המשתמש חוזר לדף (visibility change)
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (!document.hidden) {
-        console.log('🔄 Page became visible, refreshing user data...');
-        refreshUserCredits(); // Use the full refresh with Stripe sync
-      }
-    };
+  // Skip visibility change refresh for now
+  // useEffect(() => {
+  //   const handleVisibilityChange = () => {
+  //     if (!document.hidden) {
+  //       console.log('🔄 Page became visible, refreshing user data...');
+  //       refreshUserCredits();
+  //     }
+  //   };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [refreshUserCredits]);
+  //   document.addEventListener('visibilitychange', handleVisibilityChange);
+  //   return () => {
+  //     document.removeEventListener('visibilitychange', handleVisibilityChange);
+  //   };
+  // }, [refreshUserCredits]);
 
 
   const createNewChat = async () => {
