@@ -67,9 +67,9 @@ export const Core = {
       }
       
       // Check file size (max 10MB)
-      const maxSize = 10 * 1024 * 1024; // 10MB
+      const maxSize = 5 * 1024 * 1024; // 5MB
       if (file.size > maxSize) {
-        throw new Error('File size too large. Please use an image under 10MB.');
+        throw new Error('File size too large. Please use an image under 5MB.');
       }
       
       // Check file type
@@ -85,8 +85,8 @@ export const Core = {
           const base64String = reader.result;
           
           // Validate the base64 string length to ensure it fits in database
-          if (base64String.length > 450) {
-            reject(new Error('Image file is too large. Please use a smaller image (under 100KB).'));
+          if (base64String.length > 400000) { // ~300KB base64 = ~225KB file
+            reject(new Error('Image file is too large. Please use a smaller image (under 200KB).'));
             return;
           }
           
