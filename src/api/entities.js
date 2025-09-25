@@ -85,6 +85,17 @@ export const Message = {
     return result
   },
 
+  get: async (id) => {
+    const { data, error } = await supabase
+      .from('message')
+      .select('*')
+      .eq('id', id)
+      .single()
+    
+    if (error) throw new Error(`Failed to get message: ${error.message}`)
+    return data
+  },
+
   filter: async (filters, sort = 'created_at') => {
     let query = supabase.from('message').select('*')
     

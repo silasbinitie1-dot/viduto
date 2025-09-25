@@ -9,17 +9,14 @@ export default function ProductionProgress({
     chatId, 
     darkMode = false, 
     onCancel, 
-    isCancelling = false 
+    isCancelling = false,
+    isRevision = false
 }) {
     const [progress, setProgress] = useState(0);
     const [timeElapsed, setTimeElapsed] = useState(0);
-    const [estimateMinutes, setEstimateMinutes] = useState(12);
-
-    // Determine if this is a revision based on videoId
-    const isRevision = videoId && videoId.startsWith('revision_');
+    const [estimateMinutes, setEstimateMinutes] = useState(isRevision ? 5 : 12);
     
     useEffect(() => {
-        // Set estimate based on video type
         setEstimateMinutes(isRevision ? 5 : 12);
     }, [isRevision]);
 

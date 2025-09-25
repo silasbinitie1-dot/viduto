@@ -26,9 +26,45 @@ export const sendFacebookConversionEvent = async (data) => {
 }
 
 export const triggerRevisionWorkflow = async (data) => {
-  // Mock revision workflow
-  console.log('Mock revision workflow:', data)
-  return { success: true, message: 'Revision workflow triggered' }
+  try {
+    const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/start-video-production`
+    
+    const headers = {
+      'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+      'Content-Type': 'application/json',
+    }
+
+    // Get the revision message to extract the request
+    const { Message } = await import('@/api/entities')
+    const revisionMessage = await Message.get(data.message_id)
+    
+    // Get the chat to get the current brief
+    const { Chat } = await import('@/api/entities')
+    const chat = await Chat.get(data.chat_id)
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        chat_id: data.chat_id,
+        brief: `${chat.brief}\n\nRevision Request: ${revisionMessage.content}`,
+        image_url: chat.image_url,
+        is_revision: true,
+        credits_used: 2.5
+      })
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.error || 'Failed to start video revision')
+    }
+
+    const result = await response.json()
+    return result
+  } catch (error) {
+    console.error('Error triggering revision workflow:', error)
+    throw error
+  }
 }
 
 export const checkVideoStatus = async (data) => {
@@ -41,15 +77,42 @@ export const checkVideoStatus = async (data) => {
 }
 
 export const triggerInitialVideoWorkflow = async (data) => {
-  // Mock initial video workflow
-  console.log('Mock initial video workflow:', data)
-  return { success: true, message: 'Initial video workflow triggered' }
+  try {
+    const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/start-video-production`
+    
+    const headers = {
+      'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+      'Content-Type': 'application/json',
+    }
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        chat_id: data.chat_id,
+        brief: data.brief,
+        image_url: data.image_url,
+        is_revision: false,
+        credits_used: 10
+      })
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.error || 'Failed to start video production')
+    }
+
+    const result = await response.json()
+    return result
+  } catch (error) {
+    console.error('Error triggering initial video workflow:', error)
+    throw error
+  }
 }
 
 export const startVideoProduction = async (data) => {
-  // Mock video production
-  console.log('Mock video production:', data)
-  return { success: true, video_id: `video_${Date.now()}` }
+  // This function is now handled by triggerInitialVideoWorkflow
+  return triggerInitialVideoWorkflow(data)
 }
 
 export const getBlogPosts = async (data = {}) => {

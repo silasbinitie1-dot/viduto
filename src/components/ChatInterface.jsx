@@ -193,28 +193,37 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
     try {
       setLoading(true);
 
+      // Get the initial message with image URL
+      const initialMessage = messages.find(msg => msg.message_type === 'user' && msg.metadata?.image_url);
+      const imageUrl = initialMessage?.metadata?.image_url;
+
       // Call the production function
       const { triggerInitialVideoWorkflow } = await import('@/api/functions');
-      await triggerInitialVideoWorkflow({ 
+      const result = await triggerInitialVideoWorkflow({ 
         chat_id: chatId,
-        brief: currentBrief || briefText
+        brief: currentBrief || briefText,
+        image_url: imageUrl
       });
+
+      console.log('Video production started:', result);
 
       // Update chat state to production
       const { Chat } = await import('@/api/entities');
       await Chat.update(chatId, {
         workflow_state: 'in_production',
-        production_started_at: new Date().toISOString()
+        production_started_at: new Date().toISOString(),
+        active_video_id: result.video_id
       });
 
       setCurrentChat(prev => ({ 
         ...prev, 
         workflow_state: 'in_production',
-        production_started_at: new Date().toISOString()
+        production_started_at: new Date().toISOString(),
+        active_video_id: result.video_id
       }));
 
       // Add production tracking
-      const videoId = `video_${chatId}_${Date.now()}`;
+      const videoId = result.video_id;
       setProductionVideos(prev => new Map(prev).set(videoId, {
         messageId: `brief_${chatId}`,
         startedAt: Date.now(),
@@ -229,7 +238,7 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
 
     } catch (error) {
       console.error('Error starting production:', error);
-      toast.error('Failed to start video production. Please try again.');
+      toast.error(error.message || 'Failed to start video production. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -349,11 +358,26 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
       } else {
         // This is a revision request
         const { triggerRevisionWorkflow } = await import('@/api/functions');
-        await triggerRevisionWorkflow({ 
+        const result = await triggerRevisionWorkflow({ 
           chat_id: currentChatId,
           message_id: userMessage.id 
         });
+        
+        console.log('Revision workflow started:', result);
+        
+        // Add production tracking for revision
+        if (result.video_id) {
+          setProductionVideos(prev => new Map(prev).set(result.video_id, {
+            messageId: userMessage.id,
+            startedAt: Date.now(),
+            chatId: currentChatId,
+            videoId: result.video_id,
+            isRevision: true
+          }));
+        }
+        
         onCreditsRefreshed?.();
+        toast.success('Video revision started! This will take about 5 minutes.');
       }
 
     } catch (error) {
@@ -629,6 +653,7 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
                 darkMode={darkMode}
                 onCancel={handleCancelProduction}
                 isCancelling={cancelling.has(production.videoId)}
+                isRevision={production.isRevision || false}
               />
             ))}
 
