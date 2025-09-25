@@ -197,13 +197,38 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
       const initialMessage = messages.find(msg => msg.message_type === 'user' && msg.metadata?.image_url);
       const imageUrl = initialMessage?.metadata?.image_url;
 
-      // Call the production function
-      const { triggerInitialVideoWorkflow } = await import('@/api/functions');
-      const result = await triggerInitialVideoWorkflow({ 
-        chat_id: chatId,
-        brief: currentBrief || briefText,
-        image_url: imageUrl
+      // Call the actual production edge function
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session?.access_token) {
+        throw new Error('Not authenticated - please log in again');
+      }
+
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/start-video-production`;
+      
+      const headers = {
+        'Authorization': `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+      };
+
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          chat_id: chatId,
+          brief: currentBrief || briefText,
+          image_url: imageUrl,
+          is_revision: false,
+          credits_used: 10
+        })
       });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to start video production');
+      }
+
+      const result = await response.json();
 
       console.log('Video production started:', result);
 
@@ -211,14 +236,15 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
       const { Chat } = await import('@/api/entities');
       await Chat.update(chatId, {
         workflow_state: 'in_production',
-        production_started_at: new Date().toISOString()
-        // Don't set active_video_id in demo mode to avoid foreign key constraint
+        production_started_at: new Date().toISOString(),
+        active_video_id: result.video_id
       });
 
       setCurrentChat(prev => ({ 
         ...prev, 
         workflow_state: 'in_production',
-        production_started_at: new Date().toISOString()
+        production_started_at: new Date().toISOString(),
+        active_video_id: result.video_id
       }));
 
       // Add production tracking
@@ -226,14 +252,14 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
       setProductionVideos(prev => new Map(prev).set(videoId, {
         messageId: `brief_${chatId}`,
         startedAt: Date.now(),
-        chatId: chatId,
+        chat_id: chatId,
         videoId: videoId
       }));
 
       // Refresh credits
       onCreditsRefreshed?.();
 
-      toast.success('Video production started! This will take about 30 seconds (demo mode).');
+      toast.success('Video production started! This will take about 12 minutes.');
 
     } catch (error) {
       console.error('Error starting production:', error);
@@ -392,51 +418,23 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
         generateVideoBrief([userMessage], chat, newMessage.trim(), fileUrl);
       } else {
         // This is a revision request - simulate for demo
-        const revisionVideoId = crypto.randomUUID();
+        // Call the revision workflow
+        const { triggerRevisionWorkflow } = await import('@/api/functions');
+        const result = await triggerRevisionWorkflow({
+          chat_id: currentChatId,
+          message_id: userMessage.id
+        });
         
-        // Add production tracking for revision
-        setProductionVideos(prev => new Map(prev).set(revisionVideoId, {
+        // Add production tracking
+        setProductionVideos(prev => new Map(prev).set(result.video_id, {
           messageId: userMessage.id,
           startedAt: Date.now(),
           chatId: currentChatId,
-          videoId: revisionVideoId,
+          videoId: result.video_id,
           isRevision: true
         }));
         
-        // Simulate revision completion after 30 seconds
-        setTimeout(async () => {
-          try {
-            const { Message } = await import('@/api/entities');
-            await Message.create({
-              chat_id: currentChatId,
-              message_type: 'assistant',
-              content: '🎬 Your revised video is ready!',
-              metadata: {
-                video_completed: true,
-                video_url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-                video_id: revisionVideoId,
-                is_revision: true
-              }
-            });
-            
-            // Reload messages to show the completion
-            const chatMessages = await Message.filter({ chat_id: currentChatId }, 'created_at');
-            setMessages(chatMessages || []);
-            
-            // Clear production tracking
-            setProductionVideos(prev => {
-              const newMap = new Map(prev);
-              newMap.delete(revisionVideoId);
-              return newMap;
-            });
-            
-            toast.success('Your revised video is ready!');
-          } catch (error) {
-            console.error('Error in demo revision completion:', error);
-          }
-        }, 30000);
-        
-        toast.success('Video revision started! This will take about 30 seconds (demo mode).');
+        toast.success('Video revision started! This will take about 5 minutes.');
       }
 
     } catch (error) {

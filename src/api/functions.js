@@ -114,25 +114,46 @@ export const checkVideoStatus = async (data) => {
 }
 
 export const triggerInitialVideoWorkflow = async (data) => {
-  // Demo mode - generate proper UUID for video_id
-  const video_id = crypto.randomUUID();
-  
-  // Simulate deducting credits (in real app this would be done server-side)
-  console.log('Demo: Starting video production for chat:', data.chat_id);
-  
-  return {
-    success: true,
-    video_id: video_id,
-    message: 'Video production started successfully (demo mode)',
-    estimated_completion: new Date(Date.now() + 30000).toISOString(), // 30 seconds
-    demo_mode: true
-  };
-}
+  try {
+    // Get the current user's session token
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    
+    if (sessionError || !session?.access_token) {
+      throw new Error('Not authenticated - please log in again')
+    }
 
-export const startVideoProduction = async (data) => {
-  // This function is now handled by triggerInitialVideoWorkflow
-  return triggerInitialVideoWorkflow(data)
+    const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/start-video-production`
+    
+    const headers = {
+      'Authorization': `Bearer ${session.access_token}`,
+      'Content-Type': 'application/json',
+    }
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        chat_id: data.chat_id,
+        brief: data.brief,
+        image_url: data.image_url,
+        is_revision: false,
+        credits_used: 10
+      })
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.error || 'Failed to start video production')
+    }
+
+    const result = await response.json()
+    return result
+  } catch (error) {
+    console.error('Error triggering initial video workflow:', error)
+    throw error
+  }
 }
+  
 
 export const getBlogPosts = async (data = {}) => {
   // Return empty array to fall back to static posts

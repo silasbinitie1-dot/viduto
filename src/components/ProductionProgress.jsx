@@ -17,28 +17,49 @@ export default function ProductionProgress({
 }) {
     const [progress, setProgress] = useState(0);
     const [timeElapsed, setTimeElapsed] = useState(0);
-    const [estimateMinutes, setEstimateMinutes] = useState(isRevision ? 5 : 12);
+    const [estimatedDuration] = useState(isRevision ? 5 * 60 * 1000 : 12 * 60 * 1000); // 5 or 12 minutes in ms
     const [videoStatus, setVideoStatus] = useState('processing');
     const [pollingActive, setPollingActive] = useState(true);
     
+    // Polling for video status using the actual edge function
     useEffect(() => {
-        setEstimateMinutes(isRevision ? 5 : 12);
-    }, [isRevision]);
-
-    // Polling for video status
-    useEffect(() => {
-        // Demo mode - simulate completion after 30 seconds
         if (!pollingActive) return;
         
-        const completionTimeout = setTimeout(() => {
-            setVideoStatus('completed');
-            setProgress(100);
-            setPollingActive(false);
-            toast.success('Video completed successfully!');
-            onVideoCompleted?.('https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4');
-        }, 30000); // 30 seconds
+        const pollStatus = async () => {
+            try {
+                const { checkVideoStatus } = await import('@/api/functions');
+                const statusResult = await checkVideoStatus({
+                    video_id: videoId,
+                    chat_id: chatId
+                });
+                
+                if (statusResult.status === 'completed' && statusResult.video_url) {
+                    setVideoStatus('completed');
+                    setProgress(100);
+                    setPollingActive(false);
+                    toast.success('Video completed successfully!');
+                    onVideoCompleted?.(statusResult.video_url);
+                } else if (statusResult.status === 'failed') {
+                    setVideoStatus('failed');
+                    setPollingActive(false);
+                    toast.error('Video generation failed');
+                } else {
+                    // Update progress from server
+                    if (statusResult.progress !== undefined) {
+                        setProgress(statusResult.progress);
+                    }
+                }
+            } catch (error) {
+                console.error('Error polling video status:', error);
+                // Continue polling even if there's an error
+            }
+        };
         
-        return () => clearTimeout(completionTimeout);
+        // Poll immediately, then every 10 seconds
+        pollStatus();
+        const pollInterval = setInterval(pollStatus, 10000);
+        
+        return () => clearInterval(pollInterval);
     }, [pollingActive, onVideoCompleted]);
 
     useEffect(() => {
@@ -49,13 +70,15 @@ export default function ProductionProgress({
             const elapsed = Math.floor((now - startedAt) / 1000); // seconds
             setTimeElapsed(elapsed);
             
-            // Update progress based on elapsed time (30 second completion)
-            const progressPercent = Math.min((elapsed / 30) * 100, 99);
-            setProgress(progressPercent);
+            // Only update progress from time if we're not getting it from server
+            if (videoStatus === 'processing') {
+                const progressPercent = Math.min((elapsed * 1000 / estimatedDuration) * 95, 95);
+                setProgress(Math.max(progress, progressPercent));
+            }
         }, 1000);
 
         return () => clearInterval(timeInterval);
-    }, [startedAt, pollingActive]);
+    }, [startedAt, pollingActive, estimatedDuration, progress, videoStatus]);
 
     const formatTime = (seconds) => {
         const minutes = Math.floor(seconds / 60);
@@ -65,12 +88,12 @@ export default function ProductionProgress({
 
     const getStatusMessage = () => {
         if (videoStatus === 'processing') {
-            const estimateSeconds = 30000; // 30 seconds for demo (in milliseconds)
+            const estimateSeconds = estimatedDuration; // 5 or 12 minutes
             
             if (timeElapsed * 1000 < estimateSeconds) {
                 const remaining = estimateSeconds - (timeElapsed * 1000);
-                const remainingSeconds = Math.ceil(remaining / 1000);
-                return `Creating your ${isRevision ? 'revised ' : ''}video... About ${remainingSeconds} seconds remaining (demo mode)`;
+                const remainingMinutes = Math.ceil(remaining / 60000);
+                return `Creating your ${isRevision ? 'revised ' : ''}video... About ${remainingMinutes} minutes remaining`;
             } else {
                 return `Finalizing your ${isRevision ? 'revised ' : ''}video... Almost ready!`;
             }
@@ -160,7 +183,7 @@ export default function ProductionProgress({
                     <p className={`text-sm ${
                         darkMode ? 'text-orange-300' : 'text-orange-700'
                     }`}>
-                        🎬 Your demo video is almost ready! It will appear automatically in a few seconds.
+                        🎬 Your video is almost ready! It will appear automatically when processing completes.
                     </p>
                 </div>
             )}
