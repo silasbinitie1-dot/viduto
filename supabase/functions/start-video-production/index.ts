@@ -83,12 +83,11 @@ Deno.serve(async (req: Request) => {
       .insert({
         id: video_id,
         chat_id: chat_id,
-        prompt: brief,
+        prompt: brief.length > 1000 ? brief.substring(0, 1000) : brief,
         image_url: image_url,
         status: 'processing',
         credits_used: credits_used,
         processing_started_at: new Date().toISOString()
-        // Removed user_id and is_revision since they don't exist in current schema
       })
       .select()
       .single()
@@ -128,7 +127,7 @@ Deno.serve(async (req: Request) => {
       user_id: user.id,
       user_email: user.email,
       user_name: userProfile.full_name || user.email,
-      prompt: brief,
+      prompt: brief.length > 1000 ? brief.substring(0, 1000) : brief,
       image_url: image_url,
       is_revision: is_revision,
       callback_url: callbackUrl
