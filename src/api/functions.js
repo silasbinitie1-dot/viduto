@@ -102,8 +102,8 @@ export const checkVideoStatus = async (data) => {
       method: 'POST',
       headers,
       body: JSON.stringify({
-        videoId: data.video_id,
-        chatId: data.chat_id
+        videoId: data.videoId || data.video_id,
+        chatId: data.chatId || data.chat_id
       })
     })
 

@@ -7,8 +7,8 @@ const corsHeaders = {
 }
 
 interface VideoStatusRequest {
-  video_id: string
-  chat_id: string
+  videoId: string
+  chatId: string
 }
 
 Deno.serve(async (req: Request) => {
@@ -50,11 +50,11 @@ Deno.serve(async (req: Request) => {
       )
     }
 
-    const { video_id, chat_id }: VideoStatusRequest = await req.json()
+    const { videoId, chatId }: VideoStatusRequest = await req.json()
 
-    if (!video_id || !chat_id) {
+    if (!videoId || !chatId) {
       return new Response(
-        JSON.stringify({ success: false, error: 'Missing required fields: video_id and chat_id' }),
+        JSON.stringify({ success: false, error: 'Missing required fields: videoId and chatId' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -63,7 +63,7 @@ Deno.serve(async (req: Request) => {
     const { data: chat, error: chatError } = await supabase
       .from('chat')
       .select('user_id')
-      .eq('id', chat_id)
+      .eq('id', chatId)
       .single()
 
     if (chatError || !chat || chat.user_id !== user.id) {
@@ -77,8 +77,8 @@ Deno.serve(async (req: Request) => {
     const { data: video, error: videoError } = await supabase
       .from('video')
       .select('*')
-      .eq('id', video_id)
-      .eq('chat_id', chat_id)
+      .eq('video_id', videoId)
+      .eq('chat_id', chatId)
       .single()
 
     if (videoError || !video) {
@@ -92,7 +92,7 @@ Deno.serve(async (req: Request) => {
     await supabase
       .from('video')
       .update({ last_status_check: new Date().toISOString() })
-      .eq('id', video_id)
+      .eq('video_id', videoId)
 
     // Check for timeout (15 minutes)
     const processingStarted = new Date(video.processing_started_at).getTime()
@@ -108,7 +108,7 @@ Deno.serve(async (req: Request) => {
           error_message: 'Video generation timed out',
           processing_completed_at: new Date().toISOString()
         })
-        .eq('id', video_id)
+        .eq('video_id', videoId)
 
       // Update chat state
       await supabase
@@ -117,7 +117,7 @@ Deno.serve(async (req: Request) => {
           workflow_state: 'failed',
           active_video_id: null
         })
-        .eq('id', chat_id)
+        .eq('id', chatId)
 
       // Refund credits
       const { data: userProfile } = await supabase
@@ -137,13 +137,13 @@ Deno.serve(async (req: Request) => {
       await supabase
         .from('message')
         .insert({
-          chat_id: chat_id,
+          chat_id: chatId,
           message_type: 'assistant',
           content: '❌ Video generation timed out. Your credits have been refunded. Please try again or contact support if this issue persists.',
           metadata: {
             is_error: true,
             error_type: 'timeout',
-            video_id: video_id,
+            video_id: videoId,
             credits_refunded: video.credits_used
           }
         })
