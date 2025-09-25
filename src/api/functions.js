@@ -54,16 +54,23 @@ export const triggerRevisionWorkflow = async (data) => {
       method: 'POST',
       headers,
       body: JSON.stringify({
-        chat_id: data.chat_id,
+        chatId: data.chat_id,
         brief: `${chat.brief}\n\nRevision Request: ${revisionMessage.content}`,
-        image_url: chat.image_url,
-        is_revision: true,
-        credits_used: 2.5
+        imageUrl: chat.image_url,
+        isRevision: true,
+        creditsUsed: 2.5
       })
     })
 
     if (!response.ok) {
-      const errorData = await response.json()
+      const errorText = await response.text()
+      console.error('Revision API Error Response:', errorText)
+      let errorData
+      try {
+        errorData = JSON.parse(errorText)
+      } catch {
+        errorData = { error: errorText }
+      }
       throw new Error(errorData.error || 'Failed to start video revision')
     }
 
@@ -95,13 +102,20 @@ export const checkVideoStatus = async (data) => {
       method: 'POST',
       headers,
       body: JSON.stringify({
-        video_id: data.video_id,
-        chat_id: data.chat_id
+        videoId: data.video_id,
+        chatId: data.chat_id
       })
     })
 
     if (!response.ok) {
-      const errorData = await response.json()
+      const errorText = await response.text()
+      console.error('Status Check API Error Response:', errorText)
+      let errorData
+      try {
+        errorData = JSON.parse(errorText)
+      } catch {
+        errorData = { error: errorText }
+      }
       throw new Error(errorData.error || 'Failed to check video status')
     }
 

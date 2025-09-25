@@ -216,16 +216,23 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
         method: 'POST',
         headers,
         body: JSON.stringify({
-          chat_id: chatId,
+          chatId: chatId,
           brief: currentBrief || briefText,
-          image_url: imageUrl,
-          is_revision: false,
-          credits_used: 10
+          imageUrl: imageUrl,
+          isRevision: false,
+          creditsUsed: 10
         })
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
+        const errorText = await response.text();
+        console.error('API Error Response:', errorText);
+        let errorData;
+        try {
+          errorData = JSON.parse(errorText);
+        } catch {
+          errorData = { error: errorText };
+        }
         throw new Error(errorData.error || 'Failed to start video production');
       }
 
@@ -249,7 +256,7 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
       }));
 
       // Add production tracking
-      const videoId = result.video_id;
+      const videoId = result.videoId || result.video_id;
       setProductionVideos(prev => new Map(prev).set(videoId, {
         messageId: `brief_${chatId}`,
         startedAt: Date.now(),
