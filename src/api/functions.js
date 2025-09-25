@@ -47,13 +47,13 @@ export const triggerInitialVideoWorkflow = async (data) => {
 
 export const startVideoProduction = async (data) => {
   try {
-    // Dynamic imports to avoid circular dependencies
-    const { supabase } = await import('@/lib/supabase')
+    // Import Supabase client
+    const { supabase } = await import('@/lib/supabase');
     
     // Get current user
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
     if (authError || !user) {
-      throw new Error('Not authenticated')
+      throw new Error('Not authenticated');
     }
 
     // Get user profile
@@ -61,16 +61,16 @@ export const startVideoProduction = async (data) => {
       .from('users')
       .select('*')
       .eq('id', user.id)
-      .single()
+      .single();
 
     if (profileError) {
-      throw new Error(`Failed to get user profile: ${profileError.message}`)
+      throw new Error(`Failed to get user profile: ${profileError.message}`);
     }
 
     // Check if user has sufficient credits
-    const creditsRequired = data.creditsUsed || 10
+    const creditsRequired = data.creditsUsed || 10;
     if (!userProfile || userProfile.credits < creditsRequired) {
-      throw new Error(`Insufficient credits. You need ${creditsRequired} credits to start video production.`)
+      throw new Error(`Insufficient credits. You need ${creditsRequired} credits to start video production.`);
     }
 
     // Deduct credits from user account
@@ -80,14 +80,14 @@ export const startVideoProduction = async (data) => {
         credits: userProfile.credits - creditsRequired,
         updated_at: new Date().toISOString()
       })
-      .eq('id', user.id)
+      .eq('id', user.id);
 
     if (updateError) {
-      throw new Error(`Failed to deduct credits: ${updateError.message}`)
+      throw new Error(`Failed to deduct credits: ${updateError.message}`);
     }
 
     // Generate unique video ID
-    const videoId = `video_${data.chatId}_${Date.now()}`
+    const videoId = `video_${data.chatId}_${Date.now()}`;
 
     // Create video record in database
     const { data: videoRecord, error: videoError } = await supabase
@@ -104,7 +104,7 @@ export const startVideoProduction = async (data) => {
         idempotency_key: `${data.chatId}_${Date.now()}`
       })
       .select()
-      .single()
+      .single();
 
     if (videoError) {
       // Rollback credits if video creation fails
@@ -114,9 +114,9 @@ export const startVideoProduction = async (data) => {
           credits: userProfile.credits,
           updated_at: new Date().toISOString()
         })
-        .eq('id', user.id)
+        .eq('id', user.id);
       
-      throw new Error(`Failed to create video record: ${videoError.message}`)
+      throw new Error(`Failed to create video record: ${videoError.message}`);
     }
 
     // Update chat state to in_production
@@ -128,10 +128,10 @@ export const startVideoProduction = async (data) => {
         production_started_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
-      .eq('id', data.chatId)
+      .eq('id', data.chatId);
 
     if (chatUpdateError) {
-      console.error('Failed to update chat state:', chatUpdateError)
+      console.error('Failed to update chat state:', chatUpdateError);
       // Don't throw here as video is already created
     }
 
@@ -145,13 +145,13 @@ export const startVideoProduction = async (data) => {
       prompt: data.brief,
       image_url: data.imageUrl,
       is_revision: data.isRevision || false,
-      callback_url: `${import.meta.env.VITE_N8N_CALLBACK_URL || window.location.origin}/api/functions/n8nVideoCallback`,
+      callback_url: `${import.meta.env.VITE_N8N_CALLBACK_URL || window.location.origin}/functions/v1/n8nVideoCallback`,
       credits_used: creditsRequired,
       timestamp: new Date().toISOString()
-    }
+    };
 
     // Trigger n8n webhook
-    const n8nWebhookUrl = import.meta.env.VITE_N8N_INITIAL_VIDEO_WEBHOOK_URL
+    const n8nWebhookUrl = import.meta.env.VITE_N8N_INITIAL_VIDEO_WEBHOOK_URL;
     if (n8nWebhookUrl) {
       try {
         const response = await fetch(n8nWebhookUrl, {
@@ -160,15 +160,15 @@ export const startVideoProduction = async (data) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(n8nPayload)
-        })
+        });
 
         if (!response.ok) {
-          throw new Error(`N8N webhook failed: ${response.status} ${response.statusText}`)
+          throw new Error(`N8N webhook failed: ${response.status} ${response.statusText}`);
         }
 
-        console.log('N8N webhook triggered successfully for video:', videoId)
+        console.log('N8N webhook triggered successfully for video:', videoId);
       } catch (webhookError) {
-        console.error('N8N webhook error:', webhookError)
+        console.error('N8N webhook error:', webhookError);
         
         // Update video status to error
         await supabase
@@ -178,12 +178,12 @@ export const startVideoProduction = async (data) => {
             error_message: `N8N webhook failed: ${webhookError.message}`,
             updated_at: new Date().toISOString()
           })
-          .eq('id', videoRecord.id)
+          .eq('id', videoRecord.id);
         
-        throw new Error('Failed to trigger video generation workflow')
+        throw new Error('Failed to trigger video generation workflow');
       }
     } else {
-      console.warn('N8N webhook URL not configured, video will remain in pending status')
+      console.warn('N8N webhook URL not configured, video will remain in pending status');
     }
 
     return { 
@@ -191,13 +191,13 @@ export const startVideoProduction = async (data) => {
       video_id: videoId,
       database_video_id: videoRecord.id,
       message: 'Video production started successfully'
-    }
+    };
 
   } catch (error) {
-    console.error('Error in startVideoProduction:', error)
-    throw error
+    console.error('Error in startVideoProduction:', error);
+    throw error;
   }
-}
+};
 
 export const getBlogPosts = async (data = {}) => {
   // Return empty array to fall back to static posts
