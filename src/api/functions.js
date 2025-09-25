@@ -41,15 +41,162 @@ export const checkVideoStatus = async (data) => {
 }
 
 export const triggerInitialVideoWorkflow = async (data) => {
-  // Mock initial video workflow
-  console.log('Mock initial video workflow:', data)
-  return { success: true, message: 'Initial video workflow triggered' }
+  // Redirect to startVideoProduction for consistency
+  return await startVideoProduction(data)
 }
 
 export const startVideoProduction = async (data) => {
-  // Mock video production
-  console.log('Mock video production:', data)
-  return { success: true, video_id: `video_${Date.now()}` }
+  try {
+    // Dynamic imports to avoid circular dependencies
+    const { supabase } = await import('@/lib/supabase')
+    
+    // Get current user
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      throw new Error('Not authenticated')
+    }
+
+    // Get user profile
+    const { data: userProfile, error: profileError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', user.id)
+      .single()
+
+    if (profileError) {
+      throw new Error(`Failed to get user profile: ${profileError.message}`)
+    }
+
+    // Check if user has sufficient credits
+    const creditsRequired = data.creditsUsed || 10
+    if (!userProfile || userProfile.credits < creditsRequired) {
+      throw new Error(`Insufficient credits. You need ${creditsRequired} credits to start video production.`)
+    }
+
+    // Deduct credits from user account
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({ 
+        credits: userProfile.credits - creditsRequired,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', user.id)
+
+    if (updateError) {
+      throw new Error(`Failed to deduct credits: ${updateError.message}`)
+    }
+
+    // Generate unique video ID
+    const videoId = `video_${data.chatId}_${Date.now()}`
+
+    // Create video record in database
+    const { data: videoRecord, error: videoError } = await supabase
+      .from('video')
+      .insert({
+        video_id: videoId,
+        chat_id: data.chatId,
+        prompt: data.brief,
+        image_url: data.imageUrl,
+        status: 'pending',
+        credits_used: creditsRequired,
+        credits_charged: creditsRequired,
+        processing_started_at: new Date().toISOString(),
+        idempotency_key: `${data.chatId}_${Date.now()}`
+      })
+      .select()
+      .single()
+
+    if (videoError) {
+      // Rollback credits if video creation fails
+      await supabase
+        .from('users')
+        .update({ 
+          credits: userProfile.credits,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id)
+      
+      throw new Error(`Failed to create video record: ${videoError.message}`)
+    }
+
+    // Update chat state to in_production
+    const { error: chatUpdateError } = await supabase
+      .from('chat')
+      .update({
+        workflow_state: 'in_production',
+        active_video_id: videoRecord.id,
+        production_started_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', data.chatId)
+
+    if (chatUpdateError) {
+      console.error('Failed to update chat state:', chatUpdateError)
+      // Don't throw here as video is already created
+    }
+
+    // Prepare n8n webhook payload
+    const n8nPayload = {
+      video_id: videoId,
+      chat_id: data.chatId,
+      user_id: user.id,
+      user_email: userProfile.email,
+      user_name: userProfile.full_name,
+      prompt: data.brief,
+      image_url: data.imageUrl,
+      is_revision: data.isRevision || false,
+      callback_url: `${import.meta.env.VITE_N8N_CALLBACK_URL || window.location.origin}/api/functions/n8nVideoCallback`,
+      credits_used: creditsRequired,
+      timestamp: new Date().toISOString()
+    }
+
+    // Trigger n8n webhook
+    const n8nWebhookUrl = import.meta.env.VITE_N8N_INITIAL_VIDEO_WEBHOOK_URL
+    if (n8nWebhookUrl) {
+      try {
+        const response = await fetch(n8nWebhookUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(n8nPayload)
+        })
+
+        if (!response.ok) {
+          throw new Error(`N8N webhook failed: ${response.status} ${response.statusText}`)
+        }
+
+        console.log('N8N webhook triggered successfully for video:', videoId)
+      } catch (webhookError) {
+        console.error('N8N webhook error:', webhookError)
+        
+        // Update video status to error
+        await supabase
+          .from('video')
+          .update({
+            status: 'error',
+            error_message: `N8N webhook failed: ${webhookError.message}`,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', videoRecord.id)
+        
+        throw new Error('Failed to trigger video generation workflow')
+      }
+    } else {
+      console.warn('N8N webhook URL not configured, video will remain in pending status')
+    }
+
+    return { 
+      success: true, 
+      video_id: videoId,
+      database_video_id: videoRecord.id,
+      message: 'Video production started successfully'
+    }
+
+  } catch (error) {
+    console.error('Error in startVideoProduction:', error)
+    throw error
+  }
 }
 
 export const getBlogPosts = async (data = {}) => {

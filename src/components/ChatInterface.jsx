@@ -176,60 +176,58 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
 
   // Handle brief approval and start production
   const handleApproveBrief = async () => {
-    // Check if user has enough credits before starting production
-    try {
-      const { User } = await import('@/api/entities');
-      const currentUser = await User.me();
-      if (!currentUser || currentUser.credits < 10) {
-        toast.error('Insufficient credits. You need 10 credits to start video production.');
-        return;
-      }
-    } catch (error) {
-      console.error('Error checking user credits:', error);
-      toast.error('Failed to verify credits. Please try again.');
-      return;
-    }
-
     try {
       setLoading(true);
 
-      // Call the production function
-      const { triggerInitialVideoWorkflow } = await import('@/api/functions');
-      await triggerInitialVideoWorkflow({ 
-        chat_id: chatId,
-        brief: currentBrief || briefText
+      // Find the initial user message with image URL
+      const initialMessage = messages.find(msg => 
+        msg.message_type === 'user' && msg.metadata?.image_url
+      );
+      
+      if (!initialMessage || !initialMessage.metadata?.image_url) {
+        toast.error('Product image not found. Please start a new project with an image.');
+        return;
+      }
+
+      // Call the production function with proper parameters
+      const { startVideoProduction } = await import('@/api/functions');
+      const result = await startVideoProduction({
+        chatId: chatId,
+        brief: currentBrief || briefText,
+        imageUrl: initialMessage.metadata.image_url,
+        creditsUsed: 10,
+        isRevision: false
       });
 
-      // Update chat state to production
-      const { Chat } = await import('@/api/entities');
-      await Chat.update(chatId, {
-        workflow_state: 'in_production',
-        production_started_at: new Date().toISOString()
-      });
+      if (!result.success) {
+        throw new Error(result.message || 'Failed to start video production');
+      }
 
-      setCurrentChat(prev => ({ 
-        ...prev, 
+      // Update local chat state
+      setCurrentChat(prev => ({
+        ...prev,
         workflow_state: 'in_production',
-        production_started_at: new Date().toISOString()
+        production_started_at: new Date().toISOString(),
+        active_video_id: result.database_video_id
       }));
 
-      // Add production tracking
-      const videoId = `video_${chatId}_${Date.now()}`;
+      // Add production tracking with the returned video_id
       setProductionVideos(prev => new Map(prev).set(videoId, {
-        messageId: `brief_${chatId}`,
+        messageId: `production_${chatId}`,
         startedAt: Date.now(),
         chatId: chatId,
-        videoId: videoId
+        videoId: result.video_id,
+        databaseVideoId: result.database_video_id
       }));
 
       // Refresh credits
       onCreditsRefreshed?.();
 
-      toast.success('Video production started! This will take about 10 minutes.');
+      toast.success('Video production started! This will take about 10-15 minutes.');
 
     } catch (error) {
       console.error('Error starting production:', error);
-      toast.error('Failed to start video production. Please try again.');
+      toast.error(error.message || 'Failed to start video production. Please try again.');
     } finally {
       setLoading(false);
     }
