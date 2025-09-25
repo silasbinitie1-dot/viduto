@@ -125,8 +125,8 @@ Deno.serve(async (req: Request) => {
     }
     console.log('✅ User profile found:', { credits: userProfile.credits, email: userProfile.email })
 
-    if ((userProfile.credits || 0) < credits_used) {
-      console.log('❌ Insufficient credits:', { available: userProfile.credits, required: credits_used })
+    if ((userProfile.credits || 0) < creditsUsed) {
+      console.log('❌ Insufficient credits:', { available: userProfile.credits, required: creditsUsed })
       return new Response(
         JSON.stringify({ success: false, error: 'Insufficient credits' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
