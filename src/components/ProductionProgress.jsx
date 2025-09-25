@@ -29,8 +29,8 @@ export default function ProductionProgress({
             try {
                 const { checkVideoStatus } = await import('@/api/functions');
                 const statusResult = await checkVideoStatus({
-                    video_id: videoId,
-                    chat_id: chatId
+                    videoId: videoId,
+                    chatId: chatId
                 });
                 
                 if (statusResult.status === 'completed' && statusResult.video_url) {

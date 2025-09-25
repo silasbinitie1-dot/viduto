@@ -256,7 +256,7 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
       }));
 
       // Add production tracking
-      const videoId = result.videoId || result.video_id;
+      const videoId = result.videoId || result.video_id || result.id;
       setProductionVideos(prev => new Map(prev).set(videoId, {
         messageId: `brief_${chatId}`,
         startedAt: Date.now(),

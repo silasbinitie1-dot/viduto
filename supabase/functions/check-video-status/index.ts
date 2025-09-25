@@ -74,12 +74,28 @@ Deno.serve(async (req: Request) => {
     }
 
     // Get video status
-    const { data: video, error: videoError } = await supabase
+    // Try to find video by video_id first, then by UUID if not found
+    let { data: video, error: videoError } = await supabase
       .from('video')
       .select('*')
       .eq('video_id', videoId)
       .eq('chat_id', chatId)
       .single()
+
+    // If not found by video_id, try by UUID (in case videoId is actually the UUID)
+    if (videoError && videoError.code === 'PGRST116') {
+      const { data: videoByUuid, error: uuidError } = await supabase
+        .from('video')
+        .select('*')
+        .eq('id', videoId)
+        .eq('chat_id', chatId)
+        .single()
+      
+      if (!uuidError && videoByUuid) {
+        video = videoByUuid
+        videoError = null
+      }
+    }
 
     if (videoError || !video) {
       return new Response(
