@@ -1,4 +1,5 @@
 // Mock functions for demo purposes - in production these would call actual backend services
+import { supabase } from '@/lib/supabase'
 
 export const createStripeCheckoutSession = async (data) => {
   // Mock Stripe checkout - in production this would create actual Stripe sessions
@@ -27,10 +28,17 @@ export const sendFacebookConversionEvent = async (data) => {
 
 export const triggerRevisionWorkflow = async (data) => {
   try {
+    // Get the current user's session token
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    
+    if (sessionError || !session?.access_token) {
+      throw new Error('Not authenticated - please log in again')
+    }
+
     const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/start-video-production`
     
     const headers = {
-      'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+      'Authorization': `Bearer ${session.access_token}`,
       'Content-Type': 'application/json',
     }
 
@@ -78,10 +86,17 @@ export const checkVideoStatus = async (data) => {
 
 export const triggerInitialVideoWorkflow = async (data) => {
   try {
+    // Get the current user's session token
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    
+    if (sessionError || !session?.access_token) {
+      throw new Error('Not authenticated - please log in again')
+    }
+
     const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/start-video-production`
     
     const headers = {
-      'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+      'Authorization': `Bearer ${session.access_token}`,
       'Content-Type': 'application/json',
     }
 
