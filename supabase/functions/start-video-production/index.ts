@@ -135,6 +135,34 @@ Deno.serve(async (req: Request) => {
     }
 
     // NOW deduct credits since webhook was successful
+    // CRITICAL: Test N8N webhook BEFORE deducting credits
+    let n8nResponse: Response
+    try {
+      console.log('Testing N8N webhook connection...')
+      n8nResponse = await fetch(n8nWebhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(n8nPayload)
+      })
+
+      if (!n8nResponse.ok) {
+        const errorText = await n8nResponse.text().catch(() => 'Unknown error')
+        console.error('N8N webhook failed:', n8nResponse.status, n8nResponse.statusText, errorText)
+        throw new Error(`Video production service error (${n8nResponse.status}). Please contact support or try again later.`)
+      }
+
+      console.log('N8N webhook responded successfully')
+    } catch (fetchError) {
+      console.error('N8N webhook fetch error:', fetchError)
+      if (fetchError.message.includes('Video production service error')) {
+        throw fetchError // Re-throw our custom error
+      }
+      throw new Error('Video production service is currently unavailable. Please contact support or try again later.')
+    }
+
+    // NOW deduct credits since webhook was successful
     const { error: creditError } = await supabase
       .from('users')
       .update({ credits: userProfile.credits - credits_used })
@@ -143,6 +171,9 @@ Deno.serve(async (req: Request) => {
     if (creditError) {
       throw new Error('Failed to process payment. Please try again.')
     }
+
+    creditsDeducted = true
+    console.log('Credits deducted successfully after webhook confirmation')
 
     creditsDeducted = true
     console.log('Credits deducted successfully after webhook confirmation')
@@ -221,6 +252,25 @@ Deno.serve(async (req: Request) => {
   } catch (error) {
     console.error('Error in start-video-production:', error)
     
+    // Refund credits if they were deducted but something failed
+    if (creditsDeducted && userProfile) {
+      try {
+        const supabase = createClient(
+          Deno.env.get('SUPABASE_URL') ?? '',
+          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+        )
+        
+        await supabase
+          .from('users')
+          .update({ credits: userProfile.credits })
+          .eq('id', userProfile.id)
+        
+        console.log('Credits refunded due to error after deduction')
+      } catch (refundError) {
+        console.error('Failed to refund credits:', refundError)
+      }
+    }
+
     // Refund credits if they were deducted but something failed
     if (creditsDeducted && userProfile) {
       try {
