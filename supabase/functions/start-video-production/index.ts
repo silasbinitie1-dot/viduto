@@ -7,11 +7,11 @@ const corsHeaders = {
 }
 
 interface VideoProductionRequest {
-  chat_id: string
+  chatId: string
   brief: string
-  image_url?: string
-  is_revision?: boolean
-  credits_used?: number
+  imageUrl?: string
+  isRevision?: boolean
+  creditsUsed?: number
 }
 
 Deno.serve(async (req: Request) => {
@@ -61,23 +61,23 @@ Deno.serve(async (req: Request) => {
     }
     console.log('✅ User authenticated:', user.id, user.email)
 
-    const { chat_id, brief, image_url, is_revision = false, credits_used = 10 }: VideoProductionRequest = await req.json()
+    const { chatId, brief, imageUrl, isRevision = false, creditsUsed = 10 }: VideoProductionRequest = await req.json()
     
     console.log('=== START VIDEO PRODUCTION ===')
     console.log('User:', user.email)
-    console.log('Chat ID:', chat_id)
-    console.log('Credits Used:', credits_used)
+    console.log('Chat ID:', chatId)
+    console.log('Credits Used:', creditsUsed)
     console.log('Brief length:', brief?.length || 0)
-    console.log('Image URL:', image_url)
-    console.log('Is Revision:', is_revision)
+    console.log('Image URL:', imageUrl)
+    console.log('Is Revision:', isRevision)
 
-    if (!chat_id || !brief) {
-      console.log('❌ Missing required fields:', { chat_id: !!chat_id, brief: !!brief })
+    if (!chatId || !brief) {
+      console.log('❌ Missing required fields:', { chatId: !!chatId, brief: !!brief })
       return new Response(
         JSON.stringify({ 
           success: false, 
           error: 'Missing required parameters',
-          required: ['chat_id', 'brief']
+          required: ['chatId', 'brief']
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
@@ -88,7 +88,7 @@ Deno.serve(async (req: Request) => {
     const { data: chat, error: chatError } = await supabase
       .from('chat')
       .select('user_id')
-      .eq('id', chat_id)
+      .eq('id', chatId)
       .single()
 
     if (chatError || !chat) {
@@ -136,23 +136,23 @@ Deno.serve(async (req: Request) => {
 
     // Generate unique video ID
     const timestamp = Date.now()
-    const video_id = `video_${chat_id}_${timestamp}`
+    const video_id = `video_${chatId}_${timestamp}`
     console.log('🆔 Generated video_id:', video_id)
 
     // Create video record IMMEDIATELY before starting N8N workflow
     console.log('📝 Creating video record in database...')
     const videoRecord = {
       id: crypto.randomUUID(),
-      chat_id: chat_id,
+      chat_id: chatId,
       video_id: video_id,
       prompt: brief.length > 1000 ? brief.substring(0, 1000) : brief,
-      image_url: image_url,
+      image_url: imageUrl,
       status: 'processing',
-      credits_used: credits_used,
+      credits_used: creditsUsed,
       processing_started_at: new Date().toISOString(),
-      idempotency_key: `${chat_id}_${timestamp}`,
+      idempotency_key: `${chatId}_${timestamp}`,
       retry_count: 0,
-      is_revision: is_revision
+      is_revision: isRevision
     }
 
     const { data: video, error: videoError } = await supabase
@@ -171,8 +171,8 @@ Deno.serve(async (req: Request) => {
     console.log('✅ Video record created successfully:', video.id)
 
     // Deduct credits
-    console.log('💳 Deducting credits:', { from: userProfile.credits, amount: credits_used, remaining: userProfile.credits - credits_used })
-    const newCredits = (userProfile.credits || 0) - credits_used
+    console.log('💳 Deducting credits:', { from: userProfile.credits, amount: creditsUsed, remaining: userProfile.credits - creditsUsed })
+    const newCredits = (userProfile.credits || 0) - creditsUsed
     const { error: creditError } = await supabase
       .from('users')
       .update({ credits: newCredits })
@@ -198,7 +198,7 @@ Deno.serve(async (req: Request) => {
         active_video_id: video_id,
         production_started_at: new Date().toISOString()
       })
-      .eq('id', chat_id)
+      .eq('id', chatId)
     console.log('✅ Chat state updated successfully')
 
     // Get webhook URL from environment
@@ -208,7 +208,7 @@ Deno.serve(async (req: Request) => {
       
       // Rollback changes
       await supabase.from('users').update({ credits: userProfile.credits }).eq('id', user.id)
-      await supabase.from('chat').update({ workflow_state: 'awaiting_approval', active_video_id: null }).eq('id', chat_id)
+      await supabase.from('chat').update({ workflow_state: 'awaiting_approval', active_video_id: null }).eq('id', chatId)
       await supabase.from('video').update({ status: 'failed', error_message: 'N8N webhook URL not configured' }).eq('id', video.id)
       
       return new Response(
@@ -221,13 +221,13 @@ Deno.serve(async (req: Request) => {
     // Prepare N8N webhook payload
     const webhookPayload = {
       video_id: video_id,
-      chat_id: chat_id,
+      chat_id: chatId,
       user_id: user.id,
       user_email: user.email,
       user_name: userProfile.full_name || user.email,
       prompt: brief,
-      image_url: image_url,
-      is_revision: is_revision,
+      image_url: imageUrl,
+      is_revision: isRevision,
       request_timestamp: new Date().toISOString(),
       source: "Viduto",
       version: "1.0",
@@ -263,7 +263,7 @@ Deno.serve(async (req: Request) => {
         await supabase.from('chat').update({
           workflow_state: 'awaiting_approval',
           active_video_id: null
-        }).eq('id', chat_id)
+        }).eq('id', chatId)
         await supabase.from('video').update({
           status: 'failed',
           error_message: `N8N webhook failed: ${responseText}`,
@@ -292,7 +292,7 @@ Deno.serve(async (req: Request) => {
       await supabase.from('chat').update({
         workflow_state: 'awaiting_approval',
         active_video_id: null
-      }).eq('id', chat_id)
+      }).eq('id', chatId)
       await supabase.from('video').update({
         status: 'failed',
         error_message: `Webhook failed: ${webhookError.message}`,
@@ -314,32 +314,33 @@ Deno.serve(async (req: Request) => {
     await supabase
       .from('system_log')
       .insert({
-        operation: is_revision ? 'video_revision_started' : 'video_production_started',
+        operation: isRevision ? 'video_revision_started' : 'video_production_started',
         entity_type: 'video',
         entity_id: video.id,
         user_email: user.email,
-        status: 'success',
-        message: `Video ${is_revision ? 'revision' : 'production'} started successfully`,
+        status: 'success', 
+        message: `Video ${isRevision ? 'revision' : 'production'} started successfully`,
         metadata: {
           video_id: video_id,
-          chat_id: chat_id,
-          credits_used: credits_used
+          chat_id: chatId,
+          credits_used: creditsUsed
         }
       })
     console.log('✅ System log entry created')
 
     console.log('🎉 Video production started successfully:', {
       video_id,
-      chat_id,
-      estimated_completion: new Date(Date.now() + (is_revision ? 5 : 12) * 60 * 1000).toISOString()
+      chat_id: chatId,
+      estimated_completion: new Date(Date.now() + (isRevision ? 5 : 12) * 60 * 1000).toISOString()
     })
 
     return new Response(
       JSON.stringify({
         success: true,
         video_id: video_id,
-        message: `Video ${is_revision ? 'revision' : 'production'} started successfully`,
-        estimated_completion: new Date(Date.now() + (is_revision ? 5 : 12) * 60 * 1000).toISOString(),
+        videoId: video_id, // Add camelCase version for frontend compatibility
+        message: `Video ${isRevision ? 'revision' : 'production'} started successfully`,
+        estimated_completion: new Date(Date.now() + (isRevision ? 5 : 12) * 60 * 1000).toISOString(),
         webhook_called: true,
         credits_remaining: newCredits
       }),
