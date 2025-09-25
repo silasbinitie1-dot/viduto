@@ -232,26 +232,6 @@ Voiceover: [Exactly 15 words - verified word count]
         throw new Error('Invalid file provided')
       }
 
-      // Check if bucket exists, create if it doesn't
-      const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets()
-      
-      if (!bucketsError) {
-        const bucketExists = buckets.some(bucket => bucket.name === 'public-files')
-        
-        if (!bucketExists) {
-          console.log('Creating public-files bucket...')
-          const { error: createBucketError } = await supabase.storage.createBucket('public-files', {
-            public: true,
-            allowedMimeTypes: ['image/jpeg', 'image/png', 'image/webp'],
-            fileSizeLimit: 52428800 // 50MB
-          })
-          
-          if (createBucketError) {
-            console.error('Failed to create bucket:', createBucketError)
-          }
-        }
-      }
-
       // Generate unique filename
       const fileExt = file.name.split('.').pop()
       const timestamp = Date.now()
