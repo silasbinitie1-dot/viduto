@@ -238,14 +238,14 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
       await Chat.update(chatId, {
         workflow_state: 'in_production',
         production_started_at: new Date().toISOString(),
-        active_video_id: result.video_id
+        brief: currentBrief || briefText
       });
 
       setCurrentChat(prev => ({ 
         ...prev, 
         workflow_state: 'in_production',
         production_started_at: new Date().toISOString(),
-        active_video_id: result.video_id
+        brief: currentBrief || briefText
       }));
 
       // Add production tracking

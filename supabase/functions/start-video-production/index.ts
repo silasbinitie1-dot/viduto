@@ -86,8 +86,57 @@ Deno.serve(async (req: Request) => {
       )
     }
 
-    // For now, skip the N8N webhook test and just create the video record
-    // This allows the app to work without the external service
+    // Call the actual N8N webhook for video production
+    const webhookUrl = 'https://viduto.app.n8n.cloud/webhook/video-production'
+    
+    try {
+      const webhookResponse = await fetch(webhookUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          video_id: video_id,
+          chat_id: chat_id,
+          user_id: user.id,
+          user_email: user.email,
+          prompt: brief.length > 1000 ? brief.substring(0, 1000) : brief,
+          image_url: image_url,
+          is_revision: is_revision,
+          credits_used: credits_used,
+          webhook_callback_url: `${Deno.env.get('SUPABASE_URL')}/functions/v1/n8n-video-callback`
+        })
+      })
+
+      if (!webhookResponse.ok) {
+        throw new Error(`Webhook failed with status: ${webhookResponse.status}`)
+      }
+
+      console.log('Webhook called successfully')
+    } catch (webhookError) {
+      console.error('Webhook call failed:', webhookError)
+      
+      // Refund credits since webhook failed
+      await supabase
+        .from('users')
+        .update({ credits: userProfile.credits })
+        .eq('id', user.id)
+      
+      // Mark video as failed
+      await supabase
+        .from('video')
+        .update({
+          status: 'failed',
+          error_message: `Webhook failed: ${webhookError.message}`,
+          processing_completed_at: new Date().toISOString()
+        })
+        .eq('id', video_id)
+      
+      return new Response(
+        JSON.stringify({ success: false, error: 'Failed to start video production. Credits have been refunded.' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
     
     // Deduct credits
     const { error: creditError } = await supabase
@@ -136,7 +185,6 @@ Deno.serve(async (req: Request) => {
       .from('chat')
       .update({
         workflow_state: 'in_production',
-        active_video_id: video_id,
         production_started_at: new Date().toISOString()
       })
       .eq('id', chat_id)
@@ -158,52 +206,13 @@ Deno.serve(async (req: Request) => {
         }
       })
 
-    // For demo purposes, simulate completion after 30 seconds
-    setTimeout(async () => {
-      try {
-        // Simulate video completion
-        await supabase
-          .from('video')
-          .update({
-            status: 'completed',
-            video_url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-            processing_completed_at: new Date().toISOString()
-          })
-          .eq('id', video_id)
-
-        // Update chat state
-        await supabase
-          .from('chat')
-          .update({
-            workflow_state: 'completed',
-            active_video_id: null
-          })
-          .eq('id', chat_id)
-
-        // Create completion message
-        await supabase
-          .from('message')
-          .insert({
-            chat_id: chat_id,
-            message_type: 'assistant',
-            content: '🎬 Your video is ready! You can download it, share it, or request revisions.',
-            metadata: {
-              video_completed: true,
-              video_url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-              video_id: video_id
-            }
-          })
-      } catch (error) {
-        console.error('Error in demo completion:', error)
-      }
-    }, 30000) // 30 seconds
-
     return new Response(
       JSON.stringify({
         success: true,
         video_id: video_id,
         message: `Video ${is_revision ? 'revision' : 'production'} started successfully`,
-        estimated_completion: new Date(Date.now() + (is_revision ? 5 : 12) * 60 * 1000).toISOString()
+        estimated_completion: new Date(Date.now() + (is_revision ? 5 : 12) * 60 * 1000).toISOString(),
+        webhook_called: true
       }),
       {
         status: 200,
