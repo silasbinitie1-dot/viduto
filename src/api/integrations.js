@@ -244,7 +244,7 @@ Voiceover: [Exactly 15 words - verified word count]
 
       // Upload to Supabase Storage
       const { data, error } = await supabase.storage
-        .from('uploads')
+        .from('user-uploads')
         .upload(filePath, file)
 
       if (error) {
@@ -256,7 +256,7 @@ Voiceover: [Exactly 15 words - verified word count]
 
       // Get public URL
       const { data: { publicUrl } } = supabase.storage
-        .from('uploads')
+        .from('user-uploads')
         .getPublicUrl(filePath)
 
       console.log('Generated public URL:', publicUrl)
@@ -304,7 +304,7 @@ Voiceover: [Exactly 15 words - verified word count]
     const filePath = `private/${fileName}`
 
     const { data: uploadData, error } = await supabase.storage
-      .from('uploads')
+      .from('user-uploads')
       .upload(filePath, data.file)
 
     if (error) {
