@@ -25,19 +25,13 @@ export const AuthModal = ({ isOpen, onClose }) => {
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
-                    redirectTo: window.location.origin,
-                    queryParams: {
-                        access_type: 'offline',
-                        prompt: 'consent',
-                    }
+                    redirectTo: `${window.location.origin}/dashboard`
                 }
             });
             
             if (error) {
                 throw error;
             }
-            
-            // Don't set loading to false here since we're redirecting
         } catch (error) {
             console.error('Google login failed:', error);
             toast.error('Login failed. Please try again.');

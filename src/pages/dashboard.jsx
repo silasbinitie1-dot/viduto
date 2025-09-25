@@ -156,7 +156,6 @@ export default function Dashboard() {
       try {
         console.log('Dashboard - Initializing...');
         
-        // Try to get current user - this will handle session checking internally
         const currentUser = await User.me();
         console.log('Dashboard - User authenticated:', currentUser.email);
         
@@ -257,14 +256,13 @@ export default function Dashboard() {
            }
         }
       } catch (e) {
-        console.error('Authentication failed:', e);
+        if (e.message === 'Not authenticated') {
+          console.info('User not authenticated, redirecting to home page');
+        } else {
+          console.error('Initialization failed:', e);
+        }
         setAuthError(true);
-        // Don't redirect immediately - let user try to authenticate
-        setTimeout(() => {
-          if (window.location.pathname === '/dashboard') {
-            navigate('/home');
-          }
-        }, 2000);
+        setTimeout(() => navigate('/'), 1000);
       } finally {
         setLoading(false);
       }
