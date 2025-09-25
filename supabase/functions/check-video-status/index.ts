@@ -12,7 +12,7 @@ interface VideoStatusRequest {
 }
 
 Deno.serve(async (req: Request) => {
-  // Handle CORS preflight
+  // Handle CORS preflight - ALWAYS return 200 for OPTIONS
   if (req.method === 'OPTIONS') {
     return new Response(null, { 
       status: 200,
@@ -20,6 +20,7 @@ Deno.serve(async (req: Request) => {
     })
   }
 
+  // Wrap everything in try-catch to ensure CORS headers are always returned
   try {
     // Initialize Supabase client
     const supabase = createClient(
@@ -30,7 +31,10 @@ Deno.serve(async (req: Request) => {
     // Get authorization header
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
-      throw new Error('No authorization header')
+      return new Response(
+        JSON.stringify({ success: false, error: 'No authorization header' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
     // Extract token from Bearer header
@@ -40,13 +44,19 @@ Deno.serve(async (req: Request) => {
     const { data: { user }, error: authError } = await supabase.auth.getUser(token)
 
     if (authError || !user) {
-      throw new Error(`Authentication failed: ${authError?.message || 'Invalid token'}`)
+      return new Response(
+        JSON.stringify({ success: false, error: `Authentication failed: ${authError?.message || 'Invalid token'}` }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
     const { video_id, chat_id }: VideoStatusRequest = await req.json()
 
     if (!video_id || !chat_id) {
-      throw new Error('Missing required fields: video_id and chat_id')
+      return new Response(
+        JSON.stringify({ success: false, error: 'Missing required fields: video_id and chat_id' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
     // Verify user owns this chat
@@ -57,7 +67,10 @@ Deno.serve(async (req: Request) => {
       .single()
 
     if (chatError || !chat || chat.user_id !== user.id) {
-      throw new Error('Chat not found or access denied')
+      return new Response(
+        JSON.stringify({ success: false, error: 'Chat not found or access denied' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
     // Get video status
@@ -69,7 +82,10 @@ Deno.serve(async (req: Request) => {
       .single()
 
     if (videoError || !video) {
-      throw new Error('Video not found')
+      return new Response(
+        JSON.stringify({ success: false, error: 'Video not found' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
     // Update last status check
@@ -139,6 +155,7 @@ Deno.serve(async (req: Request) => {
           credits_refunded: video.credits_used
         }),
         {
+          status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       )
