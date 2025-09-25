@@ -76,11 +76,40 @@ export const triggerRevisionWorkflow = async (data) => {
 }
 
 export const checkVideoStatus = async (data) => {
-  // Mock video status check
-  return {
-    status: 'processing',
-    progress: 50,
-    estimated_completion: new Date(Date.now() + 5 * 60 * 1000).toISOString()
+  try {
+    // Get the current user's session token
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    
+    if (sessionError || !session?.access_token) {
+      throw new Error('Not authenticated - please log in again')
+    }
+
+    const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/check-video-status`
+    
+    const headers = {
+      'Authorization': `Bearer ${session.access_token}`,
+      'Content-Type': 'application/json',
+    }
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({
+        video_id: data.video_id,
+        chat_id: data.chat_id
+      })
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json()
+      throw new Error(errorData.error || 'Failed to check video status')
+    }
+
+    const result = await response.json()
+    return result
+  } catch (error) {
+    console.error('Error checking video status:', error)
+    throw error
   }
 }
 

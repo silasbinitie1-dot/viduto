@@ -462,6 +462,29 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
     }
   };
 
+  const handleVideoCompleted = useCallback(async (videoUrl) => {
+    try {
+      // Reload chat data to get the latest messages and state
+      const { Chat, Message } = await import('@/api/entities');
+      
+      const chat = await Chat.get(chatId);
+      setCurrentChat(chat);
+
+      const chatMessages = await Message.filter({ chat_id: chatId }, 'created_at');
+      setMessages(chatMessages || []);
+
+      // Clear production tracking
+      setProductionVideos(new Map());
+
+      // Refresh user credits
+      onCreditsRefreshed?.();
+
+      toast.success('Your video is ready!');
+    } catch (error) {
+      console.error('Error handling video completion:', error);
+    }
+  }, [chatId, onCreditsRefreshed]);
+
   // Get the current brief from messages - only run once when messages change
   useEffect(() => {
     if (!currentBrief) {
@@ -706,6 +729,7 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
                 onCancel={handleCancelProduction}
                 isCancelling={cancelling.has(production.videoId)}
                 isRevision={production.isRevision || false}
+                onVideoCompleted={handleVideoCompleted}
               />
             ))}
 

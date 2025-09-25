@@ -2,6 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { X, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { checkVideoStatus } from '@/api/functions';
+import { toast } from "sonner";
 
 export default function ProductionProgress({ 
     videoId, 
@@ -10,37 +12,72 @@ export default function ProductionProgress({
     darkMode = false, 
     onCancel, 
     isCancelling = false,
-    isRevision = false
+    isRevision = false,
+    onVideoCompleted
 }) {
     const [progress, setProgress] = useState(0);
     const [timeElapsed, setTimeElapsed] = useState(0);
     const [estimateMinutes, setEstimateMinutes] = useState(isRevision ? 5 : 12);
+    const [videoStatus, setVideoStatus] = useState('processing');
+    const [pollingActive, setPollingActive] = useState(true);
     
     useEffect(() => {
         setEstimateMinutes(isRevision ? 5 : 12);
     }, [isRevision]);
 
+    // Polling for video status
     useEffect(() => {
-        const interval = setInterval(() => {
+        if (!pollingActive || !videoId || !chatId) return;
+
+        const pollVideoStatus = async () => {
+            try {
+                const result = await checkVideoStatus({
+                    video_id: videoId,
+                    chat_id: chatId
+                });
+
+                setVideoStatus(result.status);
+                
+                if (result.progress !== undefined) {
+                    setProgress(result.progress);
+                }
+
+                if (result.status === 'completed') {
+                    setPollingActive(false);
+                    setProgress(100);
+                    toast.success('Video completed successfully!');
+                    onVideoCompleted?.(result.video_url);
+                } else if (result.status === 'failed') {
+                    setPollingActive(false);
+                    toast.error(`Video generation failed: ${result.error_message || 'Unknown error'}`);
+                    onCancel?.(chatId, videoId);
+                }
+            } catch (error) {
+                console.error('Error polling video status:', error);
+                // Don't stop polling on individual errors, but reduce frequency
+            }
+        };
+
+        // Initial check
+        pollVideoStatus();
+
+        // Set up polling interval (every 5 seconds)
+        const interval = setInterval(pollVideoStatus, 5000);
+
+        return () => clearInterval(interval);
+    }, [videoId, chatId, pollingActive, onVideoCompleted, onCancel]);
+
+    useEffect(() => {
+        if (!pollingActive) return;
+
+        const timeInterval = setInterval(() => {
             const now = Date.now();
             const elapsed = Math.floor((now - startedAt) / 1000); // seconds
             setTimeElapsed(elapsed);
-
-            const estimateSeconds = estimateMinutes * 60;
-            
-            // Calculate progress based on elapsed time vs estimate
-            if (elapsed < estimateSeconds) {
-                // Progressive increase during estimate period
-                const progressPercent = Math.min((elapsed / estimateSeconds) * 95, 95);
-                setProgress(progressPercent);
-            } else {
-                // After estimate time passed, stay at 99% until callback
-                setProgress(99);
-            }
         }, 1000);
 
-        return () => clearInterval(interval);
-    }, [startedAt, estimateMinutes]);
+        return () => clearInterval(timeInterval);
+    }, [startedAt, pollingActive]);
 
     const formatTime = (seconds) => {
         const minutes = Math.floor(seconds / 60);
@@ -49,15 +86,23 @@ export default function ProductionProgress({
     };
 
     const getStatusMessage = () => {
-        const estimateSeconds = estimateMinutes * 60;
-        
-        if (timeElapsed < estimateSeconds) {
-            const remaining = estimateSeconds - timeElapsed;
-            const remainingMinutes = Math.ceil(remaining / 60);
-            return `Creating your ${isRevision ? 'revised ' : ''}video... About ${remainingMinutes} min${remainingMinutes !== 1 ? 's' : ''} remaining`;
-        } else {
-            return `Finalizing your ${isRevision ? 'revised ' : ''}video... Almost ready!`;
+        if (videoStatus === 'processing') {
+            const estimateSeconds = estimateMinutes * 60;
+            
+            if (timeElapsed < estimateSeconds) {
+                const remaining = estimateSeconds - timeElapsed;
+                const remainingMinutes = Math.ceil(remaining / 60);
+                return `Creating your ${isRevision ? 'revised ' : ''}video... About ${remainingMinutes} min${remainingMinutes !== 1 ? 's' : ''} remaining`;
+            } else {
+                return `Finalizing your ${isRevision ? 'revised ' : ''}video... Almost ready!`;
+            }
+        } else if (videoStatus === 'completed') {
+            return 'Video completed successfully!';
+        } else if (videoStatus === 'failed') {
+            return 'Video generation failed';
         }
+        
+        return 'Processing...';
     };
 
     return (
