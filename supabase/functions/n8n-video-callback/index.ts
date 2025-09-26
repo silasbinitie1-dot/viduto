@@ -175,12 +175,6 @@ Deno.serve(async (req: Request) => {
         detectSessionInUrl: false
       }
     })
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-        detectSessionInUrl: false
-      }
-    })
     console.log('✅ Supabase client initialized successfully')
 
     // Parse JSON payload
