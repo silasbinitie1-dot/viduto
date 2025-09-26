@@ -231,7 +231,7 @@ Deno.serve(async (req: Request) => {
       request_timestamp: new Date().toISOString(),
       source: "Viduto",
       version: "1.0",
-      callback_url: `${Deno.env.get('SUPABASE_URL')}/functions/v1/n8n-video-callback`
+      callback_url: `https://mpypysymoauwwyjqtwxr.supabase.co/functions/v1/n8n-video-callback`
     }
 
     console.log('📤 N8N webhook payload:', JSON.stringify(webhookPayload, null, 2))

@@ -2,14 +2,14 @@ import { createClient } from 'npm:@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-webhook-secret',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
 interface N8NCallbackPayload {
   video_id: string
   chat_id: string
-  video_url: string
+  video_url?: string
   status?: 'completed' | 'failed'
   error_message?: string
   processing_time?: number
@@ -20,6 +20,7 @@ Deno.serve(async (req: Request) => {
   console.log('📥 Request method:', req.method)
   console.log('📥 Request URL:', req.url)
 
+  // Handle CORS preflight - ALWAYS return 200 for OPTIONS
   if (req.method === 'OPTIONS') {
     console.log('🔄 CORS preflight request received')
     return new Response(null, { 
@@ -134,22 +135,6 @@ Deno.serve(async (req: Request) => {
     const contentType = req.headers.get('Content-Type') || ''
     console.log('📄 Content-Type:', contentType)
 
-    if (contentType.includes('multipart/form-data')) {
-      console.warn('⚠️ Received multipart/form-data, but expecting application/json')
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'Invalid Content-Type: Please send data as application/json, not multipart/form-data',
-          expected_content_type: 'application/json',
-          received_content_type: contentType
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      )
-    }
-
     if (!contentType.includes('application/json')) {
       console.warn('⚠️ Unexpected Content-Type:', contentType)
       return new Response(
@@ -186,8 +171,6 @@ Deno.serve(async (req: Request) => {
       console.log('📋 Payload contents:', JSON.stringify(payload, null, 2))
     } catch (parseError) {
       console.error('❌ Failed to parse JSON payload:', parseError)
-      console.error('❌ Parse error details:', parseError.message)
-      console.error('❌ Parse error stack:', parseError.stack)
       return new Response(
         JSON.stringify({
           success: false,
@@ -258,7 +241,9 @@ Deno.serve(async (req: Request) => {
       }
       
       console.log('✅ Found video by UUID fallback')
-      video = videoByUuid
+      // Update video variable for the rest of the function
+      const foundVideo = videoByUuid
+      video = foundVideo
     } else {
       console.log('✅ Video record found by video_id')
     }
@@ -299,7 +284,8 @@ Deno.serve(async (req: Request) => {
           status: 'completed',
           video_url: video_url,
           processing_completed_at: new Date().toISOString(),
-          execution_time_ms: processing_time
+          execution_time_ms: processing_time,
+          webhook_received_at: new Date().toISOString()
         })
         .eq('id', video.id)
 
@@ -406,7 +392,8 @@ Deno.serve(async (req: Request) => {
         .update({
           status: 'failed',
           error_message: error_message || 'Video generation failed',
-          processing_completed_at: new Date().toISOString()
+          processing_completed_at: new Date().toISOString(),
+          webhook_received_at: new Date().toISOString()
         })
         .eq('id', video.id)
 
@@ -440,10 +427,11 @@ Deno.serve(async (req: Request) => {
         .insert({
           chat_id: chat_id,
           message_type: 'assistant',
-          content: `❌ Video generation failed: ${error_message || 'Unknown error'}. Please try again or contact support if the issue persists.`,
+          content: `❌ Video generation failed: ${error_message || 'Unknown error'}. Your credits have been refunded. Please try again or contact support if the issue persists.`,
           metadata: {
             video_failed: true,
-            error_message: error_message
+            error_message: error_message,
+            credits_refunded: video.credits_used || 10
           }
         })
 
@@ -524,10 +512,7 @@ Deno.serve(async (req: Request) => {
   } catch (error) {
     console.error('❌ CRITICAL ERROR in n8n-video-callback:', error)
     console.error('❌ Error message:', error?.message || 'No error message')
-    console.error('❌ Error name:', error?.name || 'No error name')
     console.error('❌ Error stack trace:', error?.stack || 'No stack trace')
-    console.error('❌ Full error object:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2))
-    console.error('❌ Error cause:', error?.cause || 'No error cause')
     
     return new Response(
       JSON.stringify({
