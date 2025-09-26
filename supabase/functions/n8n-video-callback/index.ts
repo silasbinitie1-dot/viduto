@@ -29,20 +29,51 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    // Log environment variable availability (masked for security)
+    // Check and validate environment variables
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
     const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const sharedSecret = Deno.env.get('SHARED_WEBHOOK_SECRET')
     
     console.log('🔑 Environment variables check:')
     console.log('  SUPABASE_URL:', supabaseUrl ? `${supabaseUrl.substring(0, 20)}...` : 'NOT SET')
     console.log('  SUPABASE_SERVICE_ROLE_KEY:', serviceRoleKey ? `${serviceRoleKey.substring(0, 10)}...` : 'NOT SET')
+    console.log('  SHARED_WEBHOOK_SECRET:', sharedSecret ? `${sharedSecret.substring(0, 10)}...` : 'NOT SET')
 
-    if (!serviceRoleKey || !supabaseUrl) {
-      console.error('❌ Missing required environment variables')
+    // Validate required environment variables
+    if (!serviceRoleKey || serviceRoleKey.trim() === '') {
+      console.error('❌ SUPABASE_SERVICE_ROLE_KEY is missing or empty')
       return new Response(
         JSON.stringify({
           success: false,
-          error: 'Server configuration error: Missing environment variables'
+          error: 'Server configuration error: SUPABASE_SERVICE_ROLE_KEY not configured'
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
+    }
+
+    if (!supabaseUrl || supabaseUrl.trim() === '') {
+      console.error('❌ SUPABASE_URL is missing or empty')
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Server configuration error: SUPABASE_URL not configured'
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
+    }
+
+    if (!sharedSecret || sharedSecret.trim() === '') {
+      console.error('❌ SHARED_WEBHOOK_SECRET is missing or empty')
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Server configuration error: SHARED_WEBHOOK_SECRET not configured'
         }),
         {
           status: 500,
@@ -55,12 +86,49 @@ Deno.serve(async (req: Request) => {
     console.log('📋 Incoming request headers:')
     for (const [key, value] of req.headers.entries()) {
       // Mask sensitive headers
-      if (key.toLowerCase().includes('authorization') || key.toLowerCase().includes('key')) {
+      if (key.toLowerCase().includes('authorization') || key.toLowerCase().includes('key') || key.toLowerCase().includes('secret')) {
         console.log(`  ${key}: ${value.substring(0, 10)}...`)
       } else {
         console.log(`  ${key}: ${value}`)
       }
     }
+
+    // Validate shared secret for webhook security
+    const incomingSecret = req.headers.get('X-Webhook-Secret')
+    console.log('🔐 Webhook secret validation:')
+    console.log('  Expected secret:', sharedSecret ? `${sharedSecret.substring(0, 10)}...` : 'NOT SET')
+    console.log('  Received secret:', incomingSecret ? `${incomingSecret.substring(0, 10)}...` : 'NOT PROVIDED')
+
+    if (!incomingSecret) {
+      console.error('❌ No X-Webhook-Secret header provided')
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Missing X-Webhook-Secret header',
+          details: 'This endpoint requires a valid webhook secret for security'
+        }),
+        {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
+    }
+
+    if (incomingSecret !== sharedSecret) {
+      console.error('❌ Invalid webhook secret provided')
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Invalid webhook secret',
+          details: 'The provided webhook secret does not match the expected value'
+        }),
+        {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
+    }
+    console.log('✅ Webhook secret validation passed')
 
     // Check Content-Type header and enforce JSON
     const contentType = req.headers.get('Content-Type') || ''
@@ -98,9 +166,15 @@ Deno.serve(async (req: Request) => {
       )
     }
 
-    // Initialize Supabase client with service role key
+    // Initialize Supabase client with service role key for server-to-server communication
     console.log('🔧 Initializing Supabase client with service role...')
     const supabase = createClient(supabaseUrl, serviceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+        detectSessionInUrl: false
+      }
+    })
       auth: {
         autoRefreshToken: false,
         persistSession: false,
@@ -118,6 +192,8 @@ Deno.serve(async (req: Request) => {
       console.log('📋 Payload contents:', JSON.stringify(payload, null, 2))
     } catch (parseError) {
       console.error('❌ Failed to parse JSON payload:', parseError)
+      console.error('❌ Parse error details:', parseError.message)
+      console.error('❌ Parse error stack:', parseError.stack)
       return new Response(
         JSON.stringify({
           success: false,
@@ -150,7 +226,7 @@ Deno.serve(async (req: Request) => {
 
     console.log('🔍 Processing callback for:', { video_id, chat_id, status })
 
-    // Find the video record using service role access
+    // Find the video record using service role access (bypasses RLS)
     console.log('🔍 Looking up video record...')
     const { data: video, error: videoFindError } = await supabase
       .from('video')
@@ -188,13 +264,12 @@ Deno.serve(async (req: Request) => {
       }
       
       console.log('✅ Found video by UUID fallback')
-      // Use the video found by UUID
       video = videoByUuid
     } else {
       console.log('✅ Video record found by video_id')
     }
 
-    // Get user_id from the associated chat
+    // Get user_id from the associated chat using service role access
     console.log('🔍 Looking up chat record...')
     const { data: chat, error: chatError } = await supabase
       .from('chat')
@@ -223,7 +298,7 @@ Deno.serve(async (req: Request) => {
     if (status === 'completed' && video_url) {
       console.log('✅ Processing successful video completion...')
       
-      // Update video record with completion data
+      // Update video record with completion data using service role access
       const { error: videoUpdateError } = await supabase
         .from('video')
         .update({
@@ -240,7 +315,7 @@ Deno.serve(async (req: Request) => {
       }
       console.log('✅ Video record updated successfully')
 
-      // Update chat state
+      // Update chat state using service role access
       console.log('💬 Updating chat state...')
       const { error: chatUpdateError } = await supabase
         .from('chat')
@@ -257,7 +332,7 @@ Deno.serve(async (req: Request) => {
       }
       console.log('✅ Chat state updated successfully')
 
-      // Create completion message for the chat
+      // Create completion message for the chat using service role access
       console.log('💬 Creating completion message...')
       const { error: messageError } = await supabase
         .from('message')
@@ -280,7 +355,7 @@ Deno.serve(async (req: Request) => {
         console.log('✅ Completion message created successfully')
       }
 
-      // Create system message with revision instructions
+      // Create system message with revision instructions using service role access
       console.log('💬 Creating system instruction message...')
       const { error: systemMessageError } = await supabase
         .from('message')
@@ -300,7 +375,7 @@ Deno.serve(async (req: Request) => {
         console.log('✅ System instruction message created successfully')
       }
 
-      // Log successful completion
+      // Log successful completion using service role access
       console.log('📊 Creating system log entry...')
       const { error: logError } = await supabase
         .from('system_log')
@@ -308,7 +383,7 @@ Deno.serve(async (req: Request) => {
           operation: 'video_production_completed',
           entity_type: 'video',
           entity_id: video.id,
-          user_email: userId,
+          user_email: userId, // This is actually user_id, but keeping for consistency
           status: 'success',
           message: 'Video production completed successfully',
           metadata: {
@@ -331,7 +406,7 @@ Deno.serve(async (req: Request) => {
     } else {
       console.log('❌ Processing failed video generation...')
       
-      // Handle failed video generation
+      // Handle failed video generation using service role access
       const { error: videoUpdateError } = await supabase
         .from('video')
         .update({
@@ -347,7 +422,7 @@ Deno.serve(async (req: Request) => {
       }
       console.log('✅ Video record updated with failure status')
 
-      // Update chat state
+      // Update chat state using service role access
       console.log('💬 Updating chat state to failed...')
       const { error: chatUpdateError } = await supabase
         .from('chat')
@@ -364,7 +439,7 @@ Deno.serve(async (req: Request) => {
         console.log('✅ Chat state updated to failed')
       }
 
-      // Create error message
+      // Create error message using service role access
       console.log('💬 Creating error message...')
       const { error: errorMessageError } = await supabase
         .from('message')
@@ -385,7 +460,7 @@ Deno.serve(async (req: Request) => {
         console.log('✅ Error message created successfully')
       }
 
-      // Refund credits to user
+      // Refund credits to user using service role access
       console.log('💳 Processing credit refund...')
       const { data: userProfile, error: userFetchError } = await supabase
         .from('users')
@@ -411,7 +486,7 @@ Deno.serve(async (req: Request) => {
         }
       }
 
-      // Log failure
+      // Log failure using service role access
       console.log('📊 Creating failure system log entry...')
       const { error: logError } = await supabase
         .from('system_log')
@@ -419,7 +494,7 @@ Deno.serve(async (req: Request) => {
           operation: 'video_production_failed',
           entity_type: 'video',
           entity_id: video.id,
-          user_email: userId,
+          user_email: userId, // This is actually user_id, but keeping for consistency
           status: 'error',
           message: 'Video production failed',
           metadata: {
@@ -454,9 +529,11 @@ Deno.serve(async (req: Request) => {
 
   } catch (error) {
     console.error('❌ CRITICAL ERROR in n8n-video-callback:', error)
-    console.error('❌ Error message:', error.message)
-    console.error('❌ Error stack trace:', error.stack)
-    console.error('❌ Full error object:', JSON.stringify(error, Object.getOwnPropertyNames(error)))
+    console.error('❌ Error message:', error?.message || 'No error message')
+    console.error('❌ Error name:', error?.name || 'No error name')
+    console.error('❌ Error stack trace:', error?.stack || 'No stack trace')
+    console.error('❌ Full error object:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2))
+    console.error('❌ Error cause:', error?.cause || 'No error cause')
     
     return new Response(
       JSON.stringify({
