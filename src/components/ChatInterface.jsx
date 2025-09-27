@@ -665,6 +665,16 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
                         </div>
                       ) : (
                         <div className="space-y-4">
+                          <div className={`prose prose-sm max-w-none ${
+                            darkMode ? 'prose-invert' : ''
+                          }`}>
+                            <div className={`whitespace-pre-wrap font-light leading-relaxed ${
+                              darkMode ? 'text-gray-300' : 'text-gray-700'
+                            }`}>
+                              {currentBrief || message.content}
+                            </div>
+                          </div>
+
                           {currentChat?.workflow_state === 'awaiting_approval' && (
                             <div className="flex gap-3 pt-4 border-t border-gray-200">
                               <Button
