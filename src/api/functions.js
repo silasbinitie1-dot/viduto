@@ -58,6 +58,11 @@ export const triggerRevisionWorkflow = async (data) => {
     const { Chat } = await import('@/api/entities')
     const chat = await Chat.get(data.chat_id)
 
+    // Check if there's an active video to revise
+    if (!chat.active_video_id) {
+      throw new Error('No active video found to revise. Please create a video first before requesting revisions.')
+    }
+
     // Get the parent video (current active video)
     const { Video } = await import('@/api/entities')
     const parentVideo = await Video.get(chat.active_video_id)
