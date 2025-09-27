@@ -301,7 +301,7 @@ Deno.serve(async (req: Request) => {
         .from('chat')
         .update({
           workflow_state: 'completed',
-          active_video_id: null,
+          active_video_id: video.id,
           updated_at: new Date().toISOString()
         })
         .eq('id', chat_id)
