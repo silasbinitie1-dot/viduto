@@ -250,7 +250,7 @@ export default function Home() {
       <header className={`fixed top-0 inset-x-0 z-50 transition-all duration-300`}>
         <div className="max-w-5xl mx-2 md:mx-auto p-2 px-4 mt-4 bg-white/70 backdrop-blur-md rounded-2xl flex items-center justify-between shadow-lg">
           <Link to="/home" className="flex items-center gap-2">
-            <img src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68b4aa46f5d6326ab93c3ed0/17cb8e7bc_vidutonobg.png" alt="Viduto Logo" className="w-8 h-8" />
+            <Logo size={32} className="w-8 h-8" />
             <span className="text-2xl font-light text-gray-900 tracking-tight hover:text-gray-700 transition-colors">
               Viduto
             </span>

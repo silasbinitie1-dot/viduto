@@ -134,6 +134,7 @@ export default function Layout({ children, currentPageName }) {
       description: 'Create viral video ads from your product images by simply chatting with AI. Transform your products into professional 30-second videos in about 10 minutes.',
       path: '/',
       image: 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68b4aa46f5d6326ab93c3ed0/e690cf3a7_IMG_6930.jpg' // Updated image URL
+      image: 'https://images.pexels.com/photos/3184465/pexels-photo-3184465.jpeg?auto=compress&cs=tinysrgb&w=800'
     },
     features: {
       title: 'Features — Viduto: AI product videos in ~10 minutes',
@@ -194,7 +195,7 @@ export default function Layout({ children, currentPageName }) {
     "@type": "Organization",
     "name": "Viduto",
     "url": baseUrl,
-    "logo": "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68b4aa46f5d6326ab93c3ed0/42beff144_vidutologotransparent.png"
+    "logo": "https://base44.com/logo_v2.svg"
   };
 
   const websiteJsonLd = {
@@ -255,9 +256,9 @@ export default function Layout({ children, currentPageName }) {
       `}</style>
       
       {/* Favicon */}
-      <link rel="icon" type="image/png" href="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68b4aa46f5d6326ab93c3ed0/42beff144_vidutologotransparent.png" />
-      <link rel="shortcut icon" type="image/png" href="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68b4aa46f5d6326ab93c3ed0/42beff144_vidutologotransparent.png" />
-      <link rel="apple-touch-icon" sizes="180x180" href="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68b4aa46f5d6326ab93c3ed0/42beff144_vidutologotransparent.png" />
+      <link rel="icon" type="image/svg+xml" href="https://base44.com/logo_v2.svg" />
+      <link rel="shortcut icon" type="image/svg+xml" href="https://base44.com/logo_v2.svg" />
+      <link rel="apple-touch-icon" sizes="180x180" href="https://base44.com/logo_v2.svg" />
       
       {/* Dynamic SEO meta */}
       <title>{current.title}</title>

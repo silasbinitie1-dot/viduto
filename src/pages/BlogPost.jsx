@@ -177,7 +177,7 @@ export default function BlogPost() {
       <header className="fixed top-0 inset-x-0 z-50">
         <div className="max-w-5xl mx-2 md:mx-auto p-2 px-4 mt-2 bg-white/70 backdrop-blur-md rounded-xl flex items-center justify-between shadow-sm">
           <Link to="/home" className="flex items-center gap-2">
-            <Logo size={20} className="w-6 h-6 md:w-8 md:h-8" />
+            <Logo size={32} className="w-8 h-8" />
             <span className="text-2xl font-light text-gray-900 tracking-tight hover:text-gray-700 transition-colors">
               Viduto
             </span>

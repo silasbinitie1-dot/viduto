@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 
 export default function Logo({ size = 32, className = "", title = "Viduto" }) {
   const [failed, setFailed] = useState(false);
-  const src = "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68b4aa46f5d6326ab93c3ed0/5a6f76fa6_vidutologotransparent.png";
+  const src = "https://base44.com/logo_v2.svg";
 
   if (failed) {
     return (
