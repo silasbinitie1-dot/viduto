@@ -230,27 +230,22 @@ Deno.serve(async (req: Request) => {
     }
     console.log('✅ Chat state updated successfully')
 
-    // Get appropriate webhook URL based on whether this is a revision
-    const initialWebhookUrl = Deno.env.get('N8N_INITIAL_VIDEO_WEBHOOK_URL')
-    const revisionWebhookUrl = Deno.env.get('N8N_REVISION_WEBHOOK_URL')
-    
-    const webhookUrl = isRevision ? revisionWebhookUrl : initialWebhookUrl
-    const webhookType = isRevision ? 'revision' : 'initial'
-    
+    // Get webhook URL from environment
+    const webhookUrl = Deno.env.get('N8N_INITIAL_VIDEO_WEBHOOK_URL')
     if (!webhookUrl) {
-      console.error(`❌ N8N_${webhookType.toUpperCase()}_VIDEO_WEBHOOK_URL not configured`)
+      console.error('❌ N8N_INITIAL_VIDEO_WEBHOOK_URL not configured')
       
       // Rollback changes
       await supabase.from('users').update({ credits: userProfile.credits }).eq('id', user.id)
       await supabase.from('chat').update({ workflow_state: 'awaiting_approval', active_video_id: null }).eq('id', chatId)
-      await supabase.from('video').update({ status: 'failed', error_message: `N8N ${webhookType} webhook URL not configured` }).eq('id', video.id)
+      await supabase.from('video').update({ status: 'failed', error_message: 'N8N webhook URL not configured' }).eq('id', video.id)
       
       return new Response(
-        JSON.stringify({ success: false, error: `N8N ${webhookType} webhook URL not configured` }),
+        JSON.stringify({ success: false, error: 'N8N webhook URL not configured' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
-    console.log(`🔗 ${webhookType} webhook URL found:`, webhookUrl)
+    console.log('🔗 Webhook URL found:', webhookUrl)
 
     // Prepare N8N webhook payload
     const webhookPayload: any = {
@@ -280,7 +275,7 @@ Deno.serve(async (req: Request) => {
     console.log('📤 N8N webhook payload:', JSON.stringify(webhookPayload, null, 2))
 
     // Trigger N8N workflow
-    console.log(`🔗 Calling N8N ${webhookType} webhook:`, webhookUrl)
+    console.log('🔗 Calling N8N webhook:', webhookUrl)
     try {
       const n8nResponse = await fetch(webhookUrl, {
         method: 'POST',
@@ -297,11 +292,11 @@ Deno.serve(async (req: Request) => {
       console.log('📡 N8N response text:', responseText)
 
       if (!n8nResponse.ok) {
-        console.error(`❌ N8N ${webhookType} webhook failed with status:`, n8nResponse.status)
+        console.error('❌ N8N webhook failed with status:', n8nResponse.status)
         console.error('❌ N8N webhook error:', responseText)
         
         // Rollback: refund credits and reset chat state
-        console.log(`🔄 Rolling back due to N8N ${webhookType} webhook failure...`)
+        console.log('🔄 Rolling back due to N8N webhook failure...')
         await supabase.from('users').update({ credits: userProfile.credits }).eq('id', user.id)
         await supabase.from('chat').update({
           workflow_state: 'awaiting_approval',
@@ -316,21 +311,21 @@ Deno.serve(async (req: Request) => {
         return new Response(
           JSON.stringify({ 
             success: false, 
-            error: `Failed to start video ${isRevision ? 'revision' : 'production'}. Credits have been refunded.`,
+            error: 'Failed to start video production. Credits have been refunded.',
             details: responseText
           }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
 
-      console.log(`✅ N8N ${webhookType} workflow started successfully:`, responseText)
+      console.log('✅ N8N workflow started successfully:', responseText)
 
     } catch (webhookError) {
-      console.error(`❌ ${webhookType} webhook call failed:`, webhookError.message)
+      console.error('❌ Webhook call failed:', webhookError.message)
       console.error('❌ Full webhook error:', webhookError)
       
       // Rollback changes
-      console.log(`🔄 Rolling back due to ${webhookType} webhook call failure...`)
+      console.log('🔄 Rolling back due to webhook call failure...')
       await supabase.from('users').update({ credits: userProfile.credits }).eq('id', user.id)
       await supabase.from('chat').update({
         workflow_state: 'awaiting_approval',
@@ -345,7 +340,7 @@ Deno.serve(async (req: Request) => {
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: `Failed to start video ${isRevision ? 'revision' : 'production'}. Credits have been refunded.`,
+          error: 'Failed to start video production. Credits have been refunded.',
           details: webhookError.message
         }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
