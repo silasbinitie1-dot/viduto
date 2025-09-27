@@ -15,6 +15,10 @@ export const Chat = {
       user_id: user.id
     }
 
+    // Truncate title if it's too long for the database column (500 chars max)
+    if (chatData.title && chatData.title.length > 500) {
+      chatData.title = chatData.title.substring(0, 497) + '...'
+    }
     const { data: result, error } = await supabase
       .from('chat')
       .insert(chatData)
