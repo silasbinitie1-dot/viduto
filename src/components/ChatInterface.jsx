@@ -54,11 +54,14 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
         const chatMessages = await Message.filter({ chat_id: chatId }, 'created_at');
         setMessages(chatMessages || []);
 
-        // Set current brief from existing messages - only set once
+        // Set current brief from existing messages or explicitly set to null
         const briefMessage = chatMessages?.find(msg => msg.metadata?.is_brief);
         if (briefMessage) {
           setCurrentBrief(briefMessage.content);
           setBriefText(briefMessage.content);
+        } else {
+          setCurrentBrief(null);
+          setBriefText('');
         }
       } catch (error) {
         console.error('Error loading chat:', error);
@@ -343,11 +346,22 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    if (!newMessage.trim() || !selectedFile) {
+    // Validation: require file only if no brief exists (initial creation)
+    if (!newMessage.trim()) {
+      toast.error('Please enter a description for your video');
+      return;
+    }
+    
+    if (!currentBrief && !selectedFile) {
+      toast.error('Please upload a product image');
+      return;
+    }
+    
+    if (currentBrief && selectedFile) {
       if (!newMessage.trim()) {
         toast.error('Please enter a description for your video');
       } else {
-        toast.error('Please upload a product image');
+        toast.error('File uploads are not allowed for revisions. Please describe your changes in text.');
       }
       return;
     }
@@ -387,6 +401,13 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
         if (fileUrl && fileUrl.startsWith('data:')) {
           throw new Error('File upload failed - received base64 URL instead of storage URL');
         }
+
+        // Update chat with new image URL if this is an existing chat
+        if (currentChatId && chat) {
+          const { Chat } = await import('@/api/entities');
+          await Chat.update(currentChatId, { image_url: fileUrl });
+          setCurrentChat(prev => ({ ...prev, image_url: fileUrl }));
+        }
       }
 
       // Create user message
@@ -401,8 +422,8 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
       // Update messages immediately
       setMessages(prev => [...prev, userMessage]);
 
-      // Check if this is the first message with image
-      const isFirstMessage = messages.length === 0;
+      // Determine if this should generate a brief or trigger revision
+      const shouldGenerateBrief = !currentBrief && fileUrl;
       
       // Clear form
       setNewMessage('');
@@ -411,8 +432,8 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
         fileInputRef.current.value = '';
       }
 
-      // If this is the first message, trigger brief generation
-      if (isFirstMessage && fileUrl) {
+      // If no brief exists and we have an image, generate brief
+      if (shouldGenerateBrief) {
         // Show generating brief indicator immediately
         setShowGeneratingBrief(true);
         // Generate brief in background - don't await to avoid blocking UI
@@ -764,7 +785,7 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
       {currentChat?.workflow_state !== 'in_production' && currentChat?.workflow_state !== 'awaiting_approval' && (
         <div className={`border-t p-4 ${darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'}`}>
           <form onSubmit={handleSubmit} className="space-y-3">
-            {selectedFile && (
+            {selectedFile && !currentBrief && (
               <div className={`flex items-center gap-2 p-3 rounded-lg border ${
                 darkMode ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-200'
               }`}>
@@ -794,7 +815,7 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
                 <textarea
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
-                  placeholder={messages.length === 0 ? "Describe your video idea..." : "Ask for changes or create a new video..."}
+                  placeholder={!currentBrief ? "Describe your video idea..." : "Ask for changes to your video..."}
                   className={`w-full p-3 rounded-xl border resize-none focus:outline-none focus:ring-2 focus:ring-orange-500 ${
                     darkMode 
                       ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
@@ -811,6 +832,7 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
                   type="file"
                   accept="image/png,image/jpeg"
                   onChange={handleFileSelect}
+                  disabled={!!currentBrief}
                   className="hidden"
                 />
                 
@@ -821,8 +843,12 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
                       toast.error('Please enter a description for your video');
                       return;
                     }
-                    if (!selectedFile) {
+                    if (!currentBrief && !selectedFile) {
                       fileInputRef.current?.click();
+                      return;
+                    }
+                    if (currentBrief && selectedFile) {
+                      toast.error('File uploads are not allowed for revisions. Please describe your changes in text.');
                       return;
                     }
                     handleSubmit(new Event('submit'));
@@ -832,7 +858,7 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
                   className={`w-10 h-10 ${
                     !newMessage.trim() 
                       ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
-                      : !selectedFile 
+                      : !currentBrief && !selectedFile 
                         ? 'bg-blue-500 text-white hover:bg-blue-600' 
                         : 'bg-orange-500 text-white hover:bg-orange-600'
                   }`}
@@ -841,7 +867,7 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : !newMessage.trim() ? (
                     <Edit3 className="w-4 h-4" />
-                  ) : !selectedFile ? (
+                  ) : !currentBrief && !selectedFile ? (
                     <Upload className="w-4 h-4" />
                   ) : (
                     <Send className="w-4 h-4" />
