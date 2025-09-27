@@ -12,6 +12,9 @@ interface VideoProductionRequest {
   imageUrl?: string
   isRevision?: boolean
   creditsUsed?: number
+  parentVideoId?: string
+  originalVideoId?: string
+  revisionRequest?: string
 }
 
 Deno.serve(async (req: Request) => {
@@ -61,7 +64,16 @@ Deno.serve(async (req: Request) => {
     }
     console.log('✅ User authenticated:', user.id, user.email)
 
-    const { chatId, brief, imageUrl, isRevision = false, creditsUsed = 10 }: VideoProductionRequest = await req.json()
+    const { 
+      chatId, 
+      brief, 
+      imageUrl, 
+      isRevision = false, 
+      creditsUsed = 10,
+      parentVideoId,
+      originalVideoId,
+      revisionRequest
+    }: VideoProductionRequest = await req.json()
     
     console.log('=== START VIDEO PRODUCTION ===')
     console.log('User:', user.email)
@@ -70,6 +82,11 @@ Deno.serve(async (req: Request) => {
     console.log('Brief length:', brief?.length || 0)
     console.log('Image URL:', imageUrl)
     console.log('Is Revision:', isRevision)
+    if (isRevision) {
+      console.log('Parent Video ID:', parentVideoId)
+      console.log('Original Video ID:', originalVideoId)
+      console.log('Revision Request:', revisionRequest)
+    }
 
     if (!chatId || !brief) {
       console.log('❌ Missing required fields:', { chatId: !!chatId, brief: !!brief })
@@ -152,7 +169,8 @@ Deno.serve(async (req: Request) => {
       processing_started_at: new Date().toISOString(),
       idempotency_key: `${chatId}_${timestamp}`,
       retry_count: 0,
-      is_revision: isRevision
+      is_revision: isRevision,
+      original_video_id: originalVideoId || null
     }
 
     const { data: video, error: videoError } = await supabase
@@ -219,7 +237,7 @@ Deno.serve(async (req: Request) => {
     console.log('🔗 Webhook URL found:', webhookUrl)
 
     // Prepare N8N webhook payload
-    const webhookPayload = {
+    const webhookPayload: any = {
       video_id: video_id,
       chat_id: chatId,
       user_id: user.id,
@@ -231,7 +249,16 @@ Deno.serve(async (req: Request) => {
       request_timestamp: new Date().toISOString(),
       source: "Viduto",
       version: "1.0",
-      callback_url: `https://mpypysymoauwwyjqtwxr.supabase.co/functions/v1/n8n-video-callback`
+      callback_url: `https://mpypysymoauwwyjqtwxr.supabase.co/functions/v1/n8n-video-callback`,
+      task_id: `task_${video_id}`
+    }
+
+    // Add revision-specific fields if this is a revision
+    if (isRevision) {
+      webhookPayload.parent_video_id = parentVideoId
+      webhookPayload.original_video_id = originalVideoId
+      webhookPayload.revision_request = revisionRequest
+      webhookPayload.timestamp = new Date().toISOString()
     }
 
     console.log('📤 N8N webhook payload:', JSON.stringify(webhookPayload, null, 2))

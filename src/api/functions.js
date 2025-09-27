@@ -35,6 +35,14 @@ export const triggerRevisionWorkflow = async (data) => {
       throw new Error('Not authenticated - please log in again')
     }
 
+    // Get user profile for user details
+    const { User } = await import('@/api/entities')
+    const userProfile = await User.me()
+    
+    if (!userProfile) {
+      throw new Error('User profile not found')
+    }
+
     const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/start-video-production`
     
     const headers = {
@@ -50,15 +58,34 @@ export const triggerRevisionWorkflow = async (data) => {
     const { Chat } = await import('@/api/entities')
     const chat = await Chat.get(data.chat_id)
 
+    // Get the parent video (current active video)
+    const { Video } = await import('@/api/entities')
+    const parentVideo = await Video.get(chat.active_video_id)
+    
+    // Determine original video ID
+    const originalVideoId = parentVideo.is_revision ? parentVideo.original_video_id : parentVideo.id
+    
+    // Get image URL from the initial user message
+    const allMessages = await Message.filter({ chat_id: data.chat_id }, 'created_at')
+    const initialMessage = allMessages.find(msg => 
+      msg.message_type === 'user' && msg.metadata?.image_url
+    )
+    
+    if (!initialMessage?.metadata?.image_url) {
+      throw new Error('Original product image not found')
+    }
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers,
       body: JSON.stringify({
-        chatId: data.chat_id,
-        brief: `${chat.brief}\n\nRevision Request: ${revisionMessage.content}`,
-        imageUrl: chat.image_url,
+        chatId: data.chat_id, 
+        brief: chat.brief,
+        imageUrl: initialMessage.metadata.image_url,
         isRevision: true,
-        creditsUsed: 2.5
+        creditsUsed: 2.5,
+        parentVideoId: chat.active_video_id,
+        originalVideoId: originalVideoId,
+        revisionRequest: revisionMessage.content
       })
     })
 
