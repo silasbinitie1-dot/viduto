@@ -550,9 +550,7 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
       <div className={`border-b p-4 flex items-center justify-between ${
         darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'
       }`}>
-        <h2 className={`text-lg font-normal ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-          {currentChat?.title || 'New Project'}
-        </h2>
+        <div></div>
         <Button
           onClick={onNewChat}
           variant="outline"
