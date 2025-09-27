@@ -84,7 +84,7 @@ export const triggerRevisionWorkflow = async (data) => {
     
     // Determine original video ID for the new revision
     // If parent is a revision, use its original_video_id; otherwise use parent's id
-    const originalVideoId = parentVideo.is_revision ? parentVideo.original_video_id : parentVideo.id
+    const originalVideoUuid = parentVideo.is_revision ? parentVideo.original_video_id : parentVideo.id
     
     // For N8N webhook consistency, we need to use the composite video_id strings
     // instead of the internal UUIDs for parent_video_id and original_video_id
@@ -92,9 +92,9 @@ export const triggerRevisionWorkflow = async (data) => {
     let originalVideoCompositeId = parentVideo.video_id
     
     // If the parent is a revision, we need to get the original video's composite ID
-    if (parentVideo.is_revision && parentVideo.original_video_id) {
+    if (parentVideo.is_revision && originalVideoUuid) {
       try {
-        const originalVideo = await Video.get(parentVideo.original_video_id)
+        const originalVideo = await Video.get(originalVideoUuid)
         originalVideoCompositeId = originalVideo.video_id
       } catch (error) {
         console.error('Error fetching original video for composite ID:', error)
@@ -124,6 +124,8 @@ export const triggerRevisionWorkflow = async (data) => {
         creditsUsed: 2.5,
         parentVideoId: parentVideoCompositeId,
         originalVideoId: originalVideoCompositeId,
+        parentVideoUuid: parentVideo.id,
+        originalVideoUuid: originalVideoUuid,
         revisionRequest: revisionMessage.content
       })
     })

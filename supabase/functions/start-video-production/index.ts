@@ -14,6 +14,8 @@ interface VideoProductionRequest {
   creditsUsed?: number
   parentVideoId?: string
   originalVideoId?: string
+  parentVideoUuid?: string
+  originalVideoUuid?: string
   revisionRequest?: string
 }
 
@@ -72,6 +74,8 @@ Deno.serve(async (req: Request) => {
       creditsUsed = 10,
       parentVideoId,
       originalVideoId,
+      parentVideoUuid,
+      originalVideoUuid,
       revisionRequest
     }: VideoProductionRequest = await req.json()
     
@@ -170,7 +174,7 @@ Deno.serve(async (req: Request) => {
       idempotency_key: `${chatId}_${timestamp}`,
       retry_count: 0,
       is_revision: isRevision,
-      original_video_id: isRevision ? (originalVideoId || null) : null
+      original_video_id: isRevision ? (originalVideoUuid || null) : null
     }
 
     const { data: video, error: videoError } = await supabase
@@ -273,6 +277,8 @@ Deno.serve(async (req: Request) => {
     if (isRevision) {
       webhookPayload.parent_video_id = parentVideoId
       webhookPayload.original_video_id = originalVideoId
+      webhookPayload.parent_video_uuid = parentVideoUuid
+      webhookPayload.original_video_uuid = originalVideoUuid
       webhookPayload.revision_request = revisionRequest
       webhookPayload.timestamp = new Date().toISOString()
     }
