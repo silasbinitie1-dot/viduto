@@ -133,7 +133,6 @@ export default function Layout({ children, currentPageName }) {
       title: 'Viduto - Create viral videos with your product',
       description: 'Create viral video ads from your product images by simply chatting with AI. Transform your products into professional 30-second videos in about 10 minutes.',
       path: '/',
-      image: 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68b4aa46f5d6326ab93c3ed0/e690cf3a7_IMG_6930.jpg' // Updated image URL
       image: 'https://images.pexels.com/photos/3184465/pexels-photo-3184465.jpeg?auto=compress&cs=tinysrgb&w=800'
     },
     features: {
