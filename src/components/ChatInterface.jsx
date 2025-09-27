@@ -402,12 +402,6 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
           throw new Error('File upload failed - received base64 URL instead of storage URL');
         }
 
-        // Update chat with new image URL if this is an existing chat
-        if (currentChatId && chat) {
-          const { Chat } = await import('@/api/entities');
-          await Chat.update(currentChatId, { image_url: fileUrl });
-          setCurrentChat(prev => ({ ...prev, image_url: fileUrl }));
-        }
       }
 
       // Create user message
