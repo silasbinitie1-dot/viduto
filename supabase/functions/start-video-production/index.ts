@@ -170,7 +170,7 @@ Deno.serve(async (req: Request) => {
       idempotency_key: `${chatId}_${timestamp}`,
       retry_count: 0,
       is_revision: isRevision,
-      original_video_id: originalVideoId || null
+      original_video_id: isRevision ? (originalVideoId || null) : null
     }
 
     const { data: video, error: videoError } = await supabase
@@ -209,7 +209,7 @@ Deno.serve(async (req: Request) => {
 
     // Update chat state
     console.log('💬 Updating chat state...')
-    await supabase
+    const { error: chatUpdateError } = await supabase
       .from('chat')
       .update({
         workflow_state: 'in_production',
@@ -217,6 +217,17 @@ Deno.serve(async (req: Request) => {
         production_started_at: new Date().toISOString()
       })
       .eq('id', chatId)
+    
+    if (chatUpdateError) {
+      console.log('❌ Chat state update failed:', chatUpdateError.message)
+      // Rollback video record and credits
+      await supabase.from('video').delete().eq('id', video.id)
+      await supabase.from('users').update({ credits: userProfile.credits }).eq('id', user.id)
+      return new Response(
+        JSON.stringify({ success: false, error: 'Failed to update chat state' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
     console.log('✅ Chat state updated successfully')
 
     // Get webhook URL from environment

@@ -58,16 +58,32 @@ export const triggerRevisionWorkflow = async (data) => {
     const { Chat } = await import('@/api/entities')
     const chat = await Chat.get(data.chat_id)
 
-    // Check if there's an active video to revise
-    if (!chat.active_video_id) {
-      throw new Error('No active video found to revise. Please create a video first before requesting revisions.')
+    // Determine the parent video to revise
+    let parentVideoId = chat.active_video_id
+    
+    // If no active video ID, try to find the most recently completed video for this chat
+    if (!parentVideoId) {
+      console.log('No active_video_id found, searching for most recent completed video...')
+      const { Video } = await import('@/api/entities')
+      const completedVideos = await Video.filter({ 
+        chat_id: data.chat_id, 
+        status: 'completed' 
+      }, '-created_at') // Sort by newest first
+      
+      if (completedVideos && completedVideos.length > 0) {
+        parentVideoId = completedVideos[0].id
+        console.log('Found most recent completed video:', parentVideoId)
+      } else {
+        throw new Error('No active video found to revise. Please create a video first before requesting revisions.')
+      }
     }
 
-    // Get the parent video (current active video)
+    // Get the parent video
     const { Video } = await import('@/api/entities')
-    const parentVideo = await Video.get(chat.active_video_id)
+    const parentVideo = await Video.get(parentVideoId)
     
-    // Determine original video ID
+    // Determine original video ID for the new revision
+    // If parent is a revision, use its original_video_id; otherwise use parent's id
     const originalVideoId = parentVideo.is_revision ? parentVideo.original_video_id : parentVideo.id
     
     // Get image URL from the initial user message
@@ -79,6 +95,7 @@ export const triggerRevisionWorkflow = async (data) => {
     if (!initialMessage?.metadata?.image_url) {
       throw new Error('Original product image not found')
     }
+    
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers,
@@ -88,7 +105,7 @@ export const triggerRevisionWorkflow = async (data) => {
         imageUrl: initialMessage.metadata.image_url,
         isRevision: true,
         creditsUsed: 2.5,
-        parentVideoId: chat.active_video_id,
+        parentVideoId: parentVideoId,
         originalVideoId: originalVideoId,
         revisionRequest: revisionMessage.content
       })
