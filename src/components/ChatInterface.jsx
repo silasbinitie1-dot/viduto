@@ -432,7 +432,7 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
         setShowGeneratingBrief(true);
         // Generate brief in background - don't await to avoid blocking UI
         generateVideoBrief([userMessage], chat, newMessage.trim(), fileUrl);
-      } else {
+      } else if (currentBrief && currentChat?.active_video_id) {
         // This is a revision request - simulate for demo
         // Call the revision workflow
         const { triggerRevisionWorkflow } = await import('@/api/functions');
@@ -451,6 +451,38 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
         }));
         
         toast.success('Video revision started! This will take about 5 minutes.');
+      } else if (currentBrief && !currentChat?.active_video_id) {
+        // Brief exists but no active video - user needs to create initial video first
+        const { Message } = await import('@/api/entities');
+        const errorMessage = await Message.create({
+          chat_id: currentChatId,
+          message_type: 'assistant',
+          content: '❌ No video found to revise. Please create your first video by approving the brief above, then you can request changes.',
+          metadata: { 
+            is_error: true,
+            error_type: 'no_active_video',
+            error_timestamp: new Date().toISOString()
+          }
+        });
+        
+        setMessages(prev => [...prev, errorMessage]);
+        toast.error('Please create your first video before requesting revisions');
+      } else {
+        // No brief and no file - this shouldn't happen due to validation, but handle gracefully
+        const { Message } = await import('@/api/entities');
+        const errorMessage = await Message.create({
+          chat_id: currentChatId,
+          message_type: 'assistant',
+          content: '❌ Please upload a product image to get started with video creation.',
+          metadata: { 
+            is_error: true,
+            error_type: 'missing_image',
+            error_timestamp: new Date().toISOString()
+          }
+        });
+        
+        setMessages(prev => [...prev, errorMessage]);
+        toast.error('Please upload a product image to get started');
       }
 
     } catch (error) {
