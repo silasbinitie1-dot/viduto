@@ -3,7 +3,7 @@ import React, { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { User } from "@/entities/User";
+import { User } from "@/api/entities";
 import { Footer } from "../components/Footer";
 import { AuthModal } from "../components/AuthModal";
 import { MobileMenu } from "../components/MobileMenu";
