@@ -451,13 +451,16 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
         }));
         
         toast.success('Video revision started! This will take about 5 minutes.');
-      } else if (currentBrief && !currentChat?.active_video_id) {
+      } else if (currentBrief && !currentChat?.active_video_id && currentChat?.workflow_state === 'awaiting_approval') {
+        // This is a brief update request
+        await handleUpdateBrief(newMessage.trim());
+      } else if (currentBrief && !currentChat?.active_video_id && currentChat?.workflow_state !== 'awaiting_approval') {
         // Brief exists but no active video - user needs to create initial video first
         const { Message } = await import('@/api/entities');
         const errorMessage = await Message.create({
           chat_id: currentChatId,
           message_type: 'assistant',
-          content: '❌ No video found to revise. Please create your first video by approving the brief above, then you can request changes.',
+          content: '❌ No video found to revise. Please create your first video by approving the video plan above, then you can request changes.',
           metadata: { 
             is_error: true,
             error_type: 'no_active_video',
@@ -645,7 +648,7 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
                     }`}>
                       <div className="flex items-center justify-between mb-4">
                         <h3 className={`text-lg font-normal ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                          📋 Video Brief
+                          📋 Video Plan
                         </h3>
                         {!editingBrief && (
                           <div className="flex gap-2">
@@ -704,23 +707,40 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
                               {currentBrief || message.content}
                             </div>
                           </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
-                          {currentChat?.workflow_state === 'awaiting_approval' && (
-                            <div className="flex gap-3 pt-4 border-t border-gray-200">
-                              <Button
-                                onClick={handleApproveBrief}
-                                disabled={loading}
-                                className="bg-orange-500 text-white hover:bg-orange-600 gap-2"
-                              >
-                                {loading ? (
-                                  <Loader2 className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  <Play className="w-4 h-4" />
-                                )}
-                                Approve & Start Production (10 credits)
-                              </Button>
-                            </div>
-                          )}
+                {/* System Approval Instruction Message */}
+                {message.message_type === 'system' && message.metadata?.is_approval_instruction && (
+                  <div className="flex justify-center">
+                    <div className={`max-w-[80%] rounded-2xl p-6 text-center ${
+                      darkMode ? 'bg-green-900/20 border border-green-700' : 'bg-green-50 border border-green-200'
+                    }`}>
+                      <div className={`prose prose-sm max-w-none ${darkMode ? 'prose-invert' : ''}`}>
+                        <div className={`font-medium leading-relaxed ${
+                          darkMode ? 'text-green-300' : 'text-green-700'
+                        }`}>
+                          {message.content}
+                        </div>
+                      </div>
+                      
+                      {currentChat?.workflow_state === 'awaiting_approval' && (
+                        <div className="mt-6">
+                          <Button
+                            onClick={handleApproveBrief}
+                            disabled={loading || updatingBrief}
+                            className="bg-orange-500 text-white hover:bg-orange-600 gap-2 px-8 py-3 text-base font-medium"
+                          >
+                            {loading ? (
+                              <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Play className="w-4 h-4" />
+                            )}
+                            Approve and start production (10 credits)
+                          </Button>
                         </div>
                       )}
                     </div>
@@ -774,10 +794,31 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
                     <Loader2 className="w-6 h-6 animate-spin text-orange-500" />
                     <div>
                       <h3 className={`text-lg font-normal ${darkMode ? 'text-white' : 'text-gray-900'}`}>
-                        Generating Video Brief...
+                        Generating Video Plan...
                       </h3>
                       <p className={`text-sm font-light ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
                         Our AI is analyzing your request and creating a detailed video plan
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Brief Update Loading */}
+            {updatingBrief && (
+              <div className="flex justify-start">
+                <div className={`max-w-[80%] rounded-2xl p-6 ${
+                  darkMode ? 'bg-gray-800 border border-gray-700' : 'bg-blue-50 border border-blue-200'
+                }`}>
+                  <div className="flex items-center gap-3">
+                    <Loader2 className="w-6 h-6 animate-spin text-orange-500" />
+                    <div>
+                      <h3 className={`text-lg font-normal ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                        Updating Video Plan...
+                      </h3>
+                      <p className={`text-sm font-light ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                        Applying your requested changes to the video plan
                       </p>
                     </div>
                   </div>
@@ -839,14 +880,14 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
                 <textarea
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
-                  placeholder={!currentBrief ? "Describe your video idea..." : "Ask for changes to your video..."}
+                  placeholder={!currentBrief ? "Describe your video idea..." : currentChat?.workflow_state === 'awaiting_approval' ? "Request changes to the video plan..." : "Ask for changes to your video..."}
                   className={`w-full p-3 rounded-xl border resize-none focus:outline-none focus:ring-2 focus:ring-orange-500 ${
                     darkMode 
                       ? 'bg-gray-700 border-gray-600 text-white placeholder-gray-400' 
                       : 'bg-white border-gray-300 text-gray-900 placeholder-gray-500'
                   }`}
                   rows={3}
-                  disabled={isSubmitting || showGeneratingBrief}
+                  disabled={isSubmitting || showGeneratingBrief || updatingBrief}
                 />
               </div>
               
@@ -871,14 +912,18 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
                       fileInputRef.current?.click();
                       return;
                     }
-                    if (currentBrief && selectedFile) {
+                    if (currentBrief && selectedFile && currentChat?.workflow_state !== 'awaiting_approval') {
                       toast.error('File uploads are not allowed for revisions. Please describe your changes in text.');
+                      return;
+                    }
+                    if (currentBrief && selectedFile && currentChat?.workflow_state === 'awaiting_approval') {
+                      toast.error('File uploads are not allowed when updating the video plan. Please describe your changes in text.');
                       return;
                     }
                     handleSubmit(new Event('submit'));
                   }}
                   size="icon"
-                  disabled={isSubmitting || showGeneratingBrief}
+                  disabled={isSubmitting || showGeneratingBrief || updatingBrief}
                   className={`w-10 h-10 ${
                     !newMessage.trim() 
                       ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
@@ -887,7 +932,7 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
                         : 'bg-orange-500 text-white hover:bg-orange-600'
                   }`}
                 >
-                  {isSubmitting ? (
+                  {isSubmitting || updatingBrief ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : !newMessage.trim() ? (
                     <Edit3 className="w-4 h-4" />
