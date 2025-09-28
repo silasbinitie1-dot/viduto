@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Check, CreditCard, HelpCircle, Zap, ExternalLink, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { createStripeCheckoutSession } from '@/api/functions';
+import { createStripeCheckoutSession } from '@/functions/createStripeCheckoutSession';
 import { toast } from "sonner";
 
 const subscriptionPlans = [
