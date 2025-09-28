@@ -11,8 +11,8 @@ import { TestimonialsSection } from '../components/TestimonialsSection';
 import { FaqsSection } from '../components/FaqsSection';
 import { CtaSection } from '../components/CtaSection';
 import { Footer } from '../components/Footer';
-import { sendFacebookConversionEvent } from '@/functions/sendFacebookConversionEvent';
-import { Toaster, toast } from 'react-hot-toast';
+import { sendFacebookConversionEvent } from '@/api/functions';
+import { toast } from 'sonner';
 
 // Helper function to convert file to base64
 const fileToBase64 = (file) => {
