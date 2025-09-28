@@ -10,7 +10,6 @@ import { HelpModal } from '../components/HelpModal';
 import { SubscriptionPage } from '../components/SubscriptionPage';
 import { WinCreditsModal } from '../components/WinCreditsModal';
 import { CreditsModal } from '../components/CreditsModal';
-import { trackSignupConversion } from '@/functions/trackSignupConversion';
 import { toast } from "sonner";
 import Logo from "@/components/Logo";
 import { ensureUserCredits, createStripeCustomerPortal, syncUserWithStripe } from '@/api/functions';
