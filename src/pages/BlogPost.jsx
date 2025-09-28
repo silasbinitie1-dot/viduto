@@ -2,7 +2,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { User } from "@/entities/User";
+import { User } from "@/api/entities";
 import { Footer } from "../components/Footer";
 import { AuthModal } from "../components/AuthModal";
 import { MobileMenu } from "../components/MobileMenu";
