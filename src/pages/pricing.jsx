@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { ArrowRight, Menu } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
+import Logo from '@/components/Logo';
 import { PricingContent } from '../components/PricingContent';
 import { Footer } from '../components/Footer';
 import { Button } from '@/components/ui/button';
