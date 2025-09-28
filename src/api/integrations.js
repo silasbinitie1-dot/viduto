@@ -137,11 +137,6 @@ OUTPUT FORMAT
 Present the video plan in a clean, visually organized format:
 
 📦 PRODUCT TYPE
-[Single word: shoes, shirt, phone, car, watch, bag, cosmetics, food, toy, furniture, etc.]
-
-🎨 VIDEO VIBE
-[Must be ONE: LUXURY / FUN / ENERGETIC / FUNNY]
-
 🎬 VIDEO TITLE
 [Catchy internal reference name]
 
