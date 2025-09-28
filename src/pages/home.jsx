@@ -159,6 +159,7 @@ export default function Home() {
 
     try {
       if (!user) {
+        // Store the data for after authentication
         const fileBase64String = await fileToBase64(selectedFile);
 
         const pendingData = {
@@ -173,8 +174,10 @@ export default function Home() {
         sessionStorage.setItem('pendingChatData', JSON.stringify(pendingData));
         setShowAuthModal(true);
       } else {
+        // User is authenticated, proceed with video creation
         const { Chat } = await import('@/api/entities');
         const { Message } = await import('@/api/entities');
+        const { InvokeLLM } = await import('@/api/integrations');
         console.log('Uploading file:', { name: selectedFile.name, size: selectedFile.size, type: selectedFile.type });
         const { UploadFile } = await import('@/api/integrations');
 
@@ -191,13 +194,43 @@ export default function Home() {
           throw new Error('File upload failed - received base64 URL instead of storage URL');
         }
 
-        await Message.create({
+        // Create user message
+        const userMessage = await Message.create({
           chat_id: newChat.id,
           message_type: 'user',
           content: prompt.trim(),
           metadata: { image_url: file_url, is_initial_request: true }
         });
 
+        // Generate video brief using AI
+        console.log('Generating brief with OpenAI...', { prompt: prompt.trim(), image: file_url });
+
+        const llmResponse = await InvokeLLM({
+          prompt: prompt.trim(),
+          image_url: file_url,
+          max_tokens: 2000
+        });
+
+        console.log('OpenAI response received:', llmResponse);
+
+        const generatedBrief = llmResponse.response;
+
+        // Create assistant message with the brief
+        await Message.create({
+          chat_id: newChat.id,
+          message_type: 'assistant',
+          content: generatedBrief,
+          metadata: { 
+            is_brief: true,
+            brief_generated_at: new Date().toISOString()
+          }
+        });
+
+        // Update chat with brief and state
+        await Chat.update(newChat.id, {
+          workflow_state: 'awaiting_approval',
+          brief: generatedBrief
+        });
         sessionStorage.removeItem('pendingChatData');
         console.log('Upload result:', { file_url });
         navigate(`/dashboard?chat=${newChat.id}`);

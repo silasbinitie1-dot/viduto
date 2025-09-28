@@ -21,11 +21,17 @@ export const AuthModal = ({ isOpen, onClose }) => {
             
             console.log('AuthModal - Starting Google OAuth login...');
             
+            // Check if there's pending chat data to determine redirect URL
+            const pendingChatData = sessionStorage.getItem('pendingChatData');
+            const redirectTo = pendingChatData 
+                ? `${window.location.origin}/dashboard?from=homepage`
+                : `${window.location.origin}/dashboard`;
+            
             // Use Supabase Google OAuth
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
-                    redirectTo: `${window.location.origin}/dashboard`
+                    redirectTo: redirectTo
                 }
             });
             
