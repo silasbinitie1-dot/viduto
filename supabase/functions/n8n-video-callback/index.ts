@@ -6,23 +6,14 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-interface N8NCallbackPayload {
-  video_id: string
-  chat_id: string
-  video_url?: string
-  status?: 'completed' | 'failed'
-  error_message?: string
-  processing_time?: number
-}
-
 Deno.serve(async (req: Request) => {
-  console.log('🚀 n8n-video-callback function called')
-  console.log('📥 Request method:', req.method)
-  console.log('📥 Request URL:', req.url)
+  console.log('=== N8N VIDEO CALLBACK START ===')
+  console.log('Request method:', req.method)
+  console.log('Request URL:', req.url)
 
   // Handle CORS preflight - ALWAYS return 200 for OPTIONS
   if (req.method === 'OPTIONS') {
-    console.log('🔄 CORS preflight request received')
+    console.log('CORS preflight request received')
     return new Response(null, { 
       status: 200,
       headers: corsHeaders 
@@ -30,472 +21,83 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    // Check and validate environment variables
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')
-    const sharedSecret = Deno.env.get('SHARED_WEBHOOK_SECRET')
+    // Initialize Supabase client with service role
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
     
-    console.log('🔑 Environment variables check:')
-    console.log('  SUPABASE_URL:', supabaseUrl ? `${supabaseUrl.substring(0, 20)}...` : 'NOT SET')
-    console.log('  SUPABASE_SERVICE_ROLE_KEY:', serviceRoleKey ? `${serviceRoleKey.substring(0, 10)}...` : 'NOT SET')
-    console.log('  SHARED_WEBHOOK_SECRET:', sharedSecret ? `${sharedSecret.substring(0, 10)}...` : 'NOT SET')
-
-    // Validate required environment variables
-    if (!serviceRoleKey || serviceRoleKey.trim() === '') {
-      console.error('❌ SUPABASE_SERVICE_ROLE_KEY is missing or empty')
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'Server configuration error: SUPABASE_SERVICE_ROLE_KEY not configured'
-        }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      )
-    }
-
-    if (!supabaseUrl || supabaseUrl.trim() === '') {
-      console.error('❌ SUPABASE_URL is missing or empty')
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'Server configuration error: SUPABASE_URL not configured'
-        }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      )
-    }
-
-    if (!sharedSecret || sharedSecret.trim() === '') {
-      console.error('❌ SHARED_WEBHOOK_SECRET is missing or empty')
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'Server configuration error: SHARED_WEBHOOK_SECRET not configured'
-        }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      )
-    }
-
-    // Log all incoming request headers for debugging
-    console.log('📋 Incoming request headers:')
-    for (const [key, value] of req.headers.entries()) {
-      // Mask sensitive headers
-      if (key.toLowerCase().includes('authorization') || key.toLowerCase().includes('key') || key.toLowerCase().includes('secret')) {
-        console.log(`  ${key}: ${value.substring(0, 10)}...`)
-      } else {
-        console.log(`  ${key}: ${value}`)
-      }
-    }
-
-    // Validate shared secret for webhook security
-    const incomingSecret = req.headers.get('X-Webhook-Secret')
-    console.log('🔐 Webhook secret validation:')
-    console.log('  Expected secret:', sharedSecret ? `${sharedSecret.substring(0, 10)}...` : 'NOT SET')
-    console.log('  Received secret:', incomingSecret ? `${incomingSecret.substring(0, 10)}...` : 'NOT PROVIDED')
-
-    if (!incomingSecret) {
-      console.error('❌ No X-Webhook-Secret header provided')
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'Missing X-Webhook-Secret header',
-          details: 'This endpoint requires a valid webhook secret for security'
-        }),
-        {
-          status: 403,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      )
-    }
-
-    if (incomingSecret !== sharedSecret) {
-      console.error('❌ Invalid webhook secret provided')
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'Invalid webhook secret',
-          details: 'The provided webhook secret does not match the expected value'
-        }),
-        {
-          status: 403,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      )
-    }
-    console.log('✅ Webhook secret validation passed')
-
-    // Check Content-Type header and enforce JSON
-    const contentType = req.headers.get('Content-Type') || ''
-    console.log('📄 Content-Type:', contentType)
-
-    if (!contentType.includes('application/json')) {
-      console.warn('⚠️ Unexpected Content-Type:', contentType)
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: `Unsupported Content-Type: ${contentType}. Please use application/json`,
-          expected_content_type: 'application/json',
-          received_content_type: contentType
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      )
-    }
-
-    // Initialize Supabase client with service role key for server-to-server communication
-    console.log('🔧 Initializing Supabase client with service role...')
-    const supabase = createClient(supabaseUrl, serviceRoleKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-        detectSessionInUrl: false
-      }
-    })
-    console.log('✅ Supabase client initialized successfully')
-
-    // Parse JSON payload
-    console.log('📦 Parsing request body as JSON...')
-    let payload: N8NCallbackPayload
+    let videoId, explicitVideoUrl, chatId, userId
+    
     try {
-      payload = await req.json()
-      console.log('✅ JSON payload parsed successfully')
-      console.log('📋 Payload contents:', JSON.stringify(payload, null, 2))
-    } catch (parseError) {
-      console.error('❌ Failed to parse JSON payload:', parseError)
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'Invalid JSON payload',
-          details: parseError.message
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      )
-    }
-
-    const { video_id, chat_id, video_url, status = 'completed', error_message, processing_time } = payload
-
-    if (!video_id || !chat_id) {
-      console.error('❌ Missing required fields:', { video_id: !!video_id, chat_id: !!chat_id })
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'Missing required fields: video_id and chat_id',
-          received_fields: { video_id: !!video_id, chat_id: !!chat_id }
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      )
-    }
-
-    console.log('🔍 Processing callback for:', { video_id, chat_id, status })
-
-    // Find the video record using service role access (bypasses RLS)
-    console.log('🔍 Looking up video record...')
-    const { data: video, error: videoFindError } = await supabase
-      .from('video')
-      .select('*')
-      .eq('video_id', video_id)
-      .single()
-
-    if (videoFindError || !video) {
-      console.error('❌ Video record not found:', { video_id, error: videoFindError?.message })
+      const contentType = req.headers.get('content-type') || ''
+      console.log('Content-Type:', contentType)
       
-      // Try to find by UUID as fallback
-      console.log('🔍 Trying to find video by UUID fallback...')
-      const { data: videoByUuid, error: uuidError } = await supabase
-        .from('video')
-        .select('*')
-        .eq('id', video_id)
-        .single()
-
-      if (uuidError || !videoByUuid) {
-        console.error('❌ Video not found by UUID either:', { video_id, error: uuidError?.message })
-        return new Response(
-          JSON.stringify({
-            success: false,
-            error: `Video record not found: ${video_id}`,
-            details: {
-              video_id_lookup_error: videoFindError?.message,
-              uuid_lookup_error: uuidError?.message
-            }
-          }),
-          {
-            status: 404,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
-        )
-      }
-      
-      console.log('✅ Found video by UUID fallback')
-      // Update video variable for the rest of the function
-      const foundVideo = videoByUuid
-      video = foundVideo
-    } else {
-      console.log('✅ Video record found by video_id')
-    }
-
-    // Get user_id from the associated chat using service role access
-    console.log('🔍 Looking up chat record...')
-    const { data: chat, error: chatError } = await supabase
-      .from('chat')
-      .select('user_id')
-      .eq('id', chat_id)
-      .single()
-
-    if (chatError || !chat) {
-      console.error('❌ Chat record not found:', { chat_id, error: chatError?.message })
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: `Chat record not found: ${chat_id}`,
-          details: chatError?.message
-        }),
-        {
-          status: 404,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      )
-    }
-    console.log('✅ Chat record found, user_id:', chat.user_id)
-
-    const userId = chat.user_id
-
-    if (status === 'completed' && video_url) {
-      console.log('✅ Processing successful video completion...')
-      
-      // Update video record with completion data using service role access
-      const { error: videoUpdateError } = await supabase
-        .from('video')
-        .update({
-          status: 'completed',
-          video_url: video_url,
-          processing_completed_at: new Date().toISOString(),
-          execution_time_ms: processing_time,
-          webhook_received_at: new Date().toISOString()
-        })
-        .eq('id', video.id)
-
-      if (videoUpdateError) {
-        console.error('❌ Failed to update video record:', videoUpdateError.message)
-        throw new Error(`Failed to update video record: ${videoUpdateError.message}`)
-      }
-      console.log('✅ Video record updated successfully')
-
-      // Update chat state using service role access
-      console.log('💬 Updating chat state...')
-      const { error: chatUpdateError } = await supabase
-        .from('chat')
-        .update({
-          workflow_state: 'completed',
-          active_video_id: video.id, // Keep pointing to the completed video for revision purposes
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', chat_id)
-
-      if (chatUpdateError) {
-        console.error('❌ Failed to update chat state:', chatUpdateError.message)
-        throw new Error(`Failed to update chat state: ${chatUpdateError.message}`)
-      }
-      console.log('✅ Chat state updated successfully')
-
-      // Create completion message for the chat using service role access
-      console.log('💬 Creating completion message...')
-      const { error: messageError } = await supabase
-        .from('message')
-        .insert({
-          chat_id: chat_id,
-          message_type: 'assistant',
-          content: '🎬 Your video is ready! You can download it, share it, or request revisions.',
-          metadata: {
-            video_completed: true,
-            video_url: video_url,
-            video_id: video_id,
-            processing_time: processing_time
-          }
-        })
-
-      if (messageError) {
-        console.error('❌ Failed to create completion message:', messageError.message)
-        // Don't throw here - video is still completed successfully
-      } else {
-        console.log('✅ Completion message created successfully')
-      }
-
-      // Create system message with revision instructions using service role access
-      console.log('💬 Creating system instruction message...')
-      const { error: systemMessageError } = await supabase
-        .from('message')
-        .insert({
-          chat_id: chat_id,
-          message_type: 'system',
-          content: 'To request changes, simply describe what you\'d like to modify (e.g., "Make it more energetic" or "Change the background music"). Each revision costs 2.5 credits.',
-          metadata: {
-            is_system_instruction: true
-          }
-        })
-
-      if (systemMessageError) {
-        console.error('❌ Failed to create system message:', systemMessageError.message)
-        // Don't throw here - video is still completed successfully
-      } else {
-        console.log('✅ System instruction message created successfully')
-      }
-
-      // Log successful completion using service role access
-      console.log('📊 Creating system log entry...')
-      const { error: logError } = await supabase
-        .from('system_log')
-        .insert({
-          operation: 'video_production_completed',
-          entity_type: 'video',
-          entity_id: video.id,
-          user_email: userId, // This is actually user_id, but keeping for consistency
-          status: 'success',
-          message: 'Video production completed successfully',
-          metadata: {
-            video_id: video_id,
-            chat_id: chat_id,
-            processing_time: processing_time,
-            video_url: video_url
-          }
-        })
-
-      if (logError) {
-        console.error('❌ Failed to create system log:', logError.message)
-        // Don't throw here - video is still completed successfully
-      } else {
-        console.log('✅ System log entry created successfully')
-      }
-
-      console.log('🎉 Video completion processed successfully')
-
-    } else {
-      console.log('❌ Processing failed video generation...')
-      
-      // Handle failed video generation using service role access
-      const { error: videoUpdateError } = await supabase
-        .from('video')
-        .update({
-          status: 'failed',
-          error_message: error_message || 'Video generation failed',
-          processing_completed_at: new Date().toISOString(),
-          webhook_received_at: new Date().toISOString()
-        })
-        .eq('id', video.id)
-
-      if (videoUpdateError) {
-        console.error('❌ Failed to update video record:', videoUpdateError.message)
-        throw new Error(`Failed to update video record: ${videoUpdateError.message}`)
-      }
-      console.log('✅ Video record updated with failure status')
-
-      // Update chat state using service role access
-      console.log('💬 Updating chat state to failed...')
-      const { error: chatUpdateError } = await supabase
-        .from('chat')
-        .update({
-          workflow_state: 'failed',
-          active_video_id: null
-        })
-        .eq('id', chat_id)
-
-      if (chatUpdateError) {
-        console.error('❌ Failed to update chat state:', chatUpdateError.message)
-        // Don't throw here - continue with refund process
-      } else {
-        console.log('✅ Chat state updated to failed')
-      }
-
-      // Create error message using service role access
-      console.log('💬 Creating error message...')
-      const { error: errorMessageError } = await supabase
-        .from('message')
-        .insert({
-          chat_id: chat_id,
-          message_type: 'assistant',
-          content: `❌ Video generation failed: ${error_message || 'Unknown error'}. Your credits have been refunded. Please try again or contact support if the issue persists.`,
-          metadata: {
-            video_failed: true,
-            error_message: error_message,
-            credits_refunded: video.credits_used || 10
-          }
-        })
-
-      if (errorMessageError) {
-        console.error('❌ Failed to create error message:', errorMessageError.message)
-        // Don't throw here - continue with refund process
-      } else {
-        console.log('✅ Error message created successfully')
-      }
-
-      // Refund credits to user using service role access
-      console.log('💳 Processing credit refund...')
-      const { data: userProfile, error: userFetchError } = await supabase
-        .from('users')
-        .select('credits')
-        .eq('id', userId)
-        .single()
-
-      if (userFetchError || !userProfile) {
-        console.error('❌ Failed to fetch user profile for refund:', userFetchError?.message)
-      } else {
-        const refundAmount = video.credits_used || 10
-        const newCredits = userProfile.credits + refundAmount
+      if (contentType.includes('application/json')) {
+        console.log('Parsing JSON data...')
+        const body = await req.json()
+        console.log('Request body:', JSON.stringify(body, null, 2))
         
-        const { error: refundError } = await supabase
-          .from('users')
-          .update({ credits: newCredits })
-          .eq('id', userId)
-
-        if (refundError) {
-          console.error('❌ Failed to refund credits:', refundError.message)
-        } else {
-          console.log('✅ Credits refunded successfully:', { refunded: refundAmount, new_total: newCredits })
+        videoId = body.video_id || body.videoId
+        explicitVideoUrl = body.video_url || body.explicitVideoUrl
+        chatId = body.chat_id || body.chatId
+        userId = body.user_id || body.userId
+        
+      } else if (contentType.includes('multipart/form-data')) {
+        console.log('Parsing form data...')
+        const formData = await req.formData()
+        
+        for (const [key, value] of formData.entries()) {
+          console.log(`  ${key}: ${value}`)
         }
-      }
-
-      // Log failure using service role access
-      console.log('📊 Creating failure system log entry...')
-      const { error: logError } = await supabase
-        .from('system_log')
-        .insert({
-          operation: 'video_production_failed',
-          entity_type: 'video',
-          entity_id: video.id,
-          user_email: userId, // This is actually user_id, but keeping for consistency
-          status: 'error',
-          message: 'Video production failed',
-          metadata: {
-            video_id: video_id,
-            chat_id: chat_id,
-            error_message: error_message
-          }
-        })
-
-      if (logError) {
-        console.error('❌ Failed to create failure log:', logError.message)
+        
+        videoId = formData.get('video_id') || formData.get('videoId')
+        explicitVideoUrl = formData.get('video_url')
+        chatId = formData.get('chat_id') || formData.get('chatId')
+        userId = formData.get('user_id') || formData.get('userId')
+        
       } else {
-        console.log('✅ Failure system log entry created successfully')
+        console.log('Parsing URL search params...')
+        const url = new URL(req.url)
+        
+        videoId = url.searchParams.get('video_id') || url.searchParams.get('videoId')
+        explicitVideoUrl = url.searchParams.get('video_url') || url.searchParams.get('explicitVideoUrl')
+        chatId = url.searchParams.get('chat_id') || url.searchParams.get('chatId')
+        userId = url.searchParams.get('user_id') || url.searchParams.get('userId')
       }
-
-      console.log('💔 Video failure processed successfully')
+      
+    } catch (parseError) {
+      console.error('Error parsing request:', parseError)
+      return new Response(
+        JSON.stringify({ 
+          error: 'Failed to parse request data',
+          details: parseError.message 
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
-
-    console.log('🎯 Callback processing completed successfully')
+    
+    console.log('Extracted parameters:')
+    console.log('  videoId:', videoId)
+    console.log('  explicitVideoUrl:', explicitVideoUrl)
+    console.log('  chatId:', chatId)
+    console.log('  userId:', userId)
+    
+    if (!videoId) {
+      console.error('Missing video_id/videoId parameter')
+      return new Response(
+        JSON.stringify({ error: 'Missing video_id / videoId' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+    
+    if (!explicitVideoUrl) {
+      console.error('Missing video_url parameter')
+      return new Response(
+        JSON.stringify({ error: 'Missing video_url' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
     return new Response(
       JSON.stringify({
         success: true,
@@ -509,21 +111,195 @@ Deno.serve(async (req: Request) => {
       }
     )
 
+    if (!chatId) {
+    // Find and update the video record using service role
+    console.log(`Looking for video with video_id: ${videoId}`)
+    const { data: videos, error: videoFindError } = await supabase
+      .from('video')
+      .select('*')
+      .eq('video_id', String(videoId))
+      .order('created_at', { ascending: false })
+      .limit(5)
+    
+    console.log(`Found ${videos ? videos.length : 0} videos with exact video_id match`)
+    
+    let video = null
+    
+    if (videos && videos.length > 0) {
+      video = videos[0]
+    } else {
+      // Fallback: try to find by chat_id and processing status
+      console.log(`No exact match, looking for processing video in chat: ${chatId}`)
+      const { data: processingVideos, error: processingError } = await supabase
+        .from('video')
+        .select('*')
+        .eq('chat_id', String(chatId))
+        .eq('status', 'processing')
+        .order('created_at', { ascending: false })
+        .limit(5)
+      
+      if (processingVideos && processingVideos.length > 0) {
+        video = processingVideos[0]
+        console.log(`Found processing video in chat: ${video.id}`)
+      }
+    }
+    
+    if (!video) {
+      console.error(`No video found with video_id: ${videoId} or processing video in chat: ${chatId}`)
+      return new Response(
+        JSON.stringify({ 
+          error: 'Video not found',
+          video_id: videoId,
+          chat_id: chatId
+        }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+    
+    // Update the video record
+    console.log(`Updating video ${video.id} with completed status and URL`)
+    const { error: videoUpdateError } = await supabase
+      .from('video')
+      .update({
+        video_id: videoId, // Ensure the video_id is updated in case we found it by fallback
+        video_url: explicitVideoUrl,
+        status: 'completed',
+        processing_completed_at: new Date().toISOString(),
+        webhook_received_at: new Date().toISOString()
+      })
+      .eq('id', video.id)
+    
+    if (videoUpdateError) {
+      console.error('Failed to update video record:', videoUpdateError.message)
+      throw new Error(`Failed to update video record: ${videoUpdateError.message}`)
+    }
+    
+    console.log(`Successfully updated video ${video.id}`)
+    
+    // Update chat state using service role
+    console.log(`Updating chat ${chatId} to completed state`)
+    const { error: chatUpdateError } = await supabase
+      .from('chat')
+      .update({
+        workflow_state: 'completed',
+        active_video_id: video.id, // Keep pointing to the completed video for revision purposes
+        is_locked: false,
+        locked_until: null,
+        lock_reason: null,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', chatId)
+    
+    if (chatUpdateError) {
+      console.error('Failed to update chat state:', chatUpdateError.message)
+      throw new Error(`Failed to update chat state: ${chatUpdateError.message}`)
+    }
+    
+    console.log(`Successfully updated chat ${chatId}`)
+    
+    // Create completion messages using service role
+    console.log(`Creating completion messages for chat ${chatId}`)
+      console.error('Missing chat_id parameter')
+    // 1) Video message first (so the video appears before any text in chat)
+    const { error: videoMessageError } = await supabase
+      .from('message')
+      .insert({
+        chat_id: chatId,
+        message_type: 'assistant',
+        content: "",
+        metadata: {
+          video_completed: true,
+          video_url: explicitVideoUrl,
+          video_id: videoId,
+          generation_id: `completion_${videoId}_${Date.now()}`,
+          video_only: true
+        }
+      })
+      return new Response(
+    if (videoMessageError) {
+      console.error('Failed to create video message:', videoMessageError.message)
+    }
+        JSON.stringify({ error: 'Missing chat_id' }),
+    // 2) Text message after the video
+    const completionMessage = `🎉 **Your video is ready!**
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+Your professional 30-second video has been created successfully. You can download it, share it on social media, or request revisions (costs 2.5 credits).`
+      )
+    const { error: textMessageError } = await supabase
+      .from('message')
+      .insert({
+        chat_id: chatId,
+        message_type: 'assistant',
+        content: completionMessage,
+        metadata: {
+          notice_type: 'video_ready',
+          video_id: videoId
+        }
+      })
+    }
+    if (textMessageError) {
+      console.error('Failed to create text message:', textMessageError.message)
+    }
   } catch (error) {
+    // 3) Optional revision guidance message
+    const revisionGuidance = `**Want to make changes?**
     console.error('❌ CRITICAL ERROR in n8n-video-callback:', error)
+Describe any adjustments you'd like, and I'll create a revised version for you. It takes about 10 minutes to generate. Each revision costs 2.5 credits.`
     console.error('❌ Error message:', error?.message || 'No error message')
+    const { error: revisionMessageError } = await supabase
+      .from('message')
+      .insert({
+        chat_id: chatId,
+        message_type: 'assistant',
+        content: revisionGuidance,
+        metadata: {
+          revision_option: true,
+          parent_video_id: videoId
+        }
+      })
     console.error('❌ Error stack trace:', error?.stack || 'No stack trace')
+    if (revisionMessageError) {
+      console.error('Failed to create revision message:', revisionMessageError.message)
+    }
+    
+    console.log('Successfully created completion messages')
+    
+    // Log successful completion
+    const { error: logError } = await supabase
+      .from('system_log')
+      .insert({
+        operation: 'video_production_completed',
+        entity_type: 'video',
+        entity_id: video.id,
+        user_email: userId || 'system',
+        status: 'success',
+        message: 'Video production completed successfully',
+        metadata: {
+          video_id: videoId,
+          chat_id: chatId,
+          video_url: explicitVideoUrl
+        }
+      })
+    
+    if (logError) {
+      console.error('Failed to create system log:', logError.message)
+    }
     
     return new Response(
       JSON.stringify({
         success: false,
         error: error.message || 'Internal server error',
-        timestamp: new Date().toISOString()
-      }),
-      {
+        video_id: videoId,
+        error: 'Internal server error',
+        details: error.message
+        status: 'completed'
         status: 500,
+        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     )
   }
 })
+    console.error('=== CALLBACK ERROR ===')
+    console.error('Error processing callback:', error)
+    console.error('Stack trace:', error.stack)
