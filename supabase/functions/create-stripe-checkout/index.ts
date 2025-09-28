@@ -280,38 +280,64 @@ Deno.serve(async (req: Request) => {
         )
       }
 
-      // If user already has an active subscription, calculate prorated credits
+      // Check if user has existing subscription that needs to be upgraded via Subscription Schedule
       if (userProfile.subscription_status === 'active' && userProfile.current_plan !== 'Free') {
-        const newCredits = calculateNewCredits(
-          userProfile.credits || 0,
-          userProfile.current_plan,
-          newPlanInfo.name
-        )
-
-        // Update user with new plan and calculated credits immediately
-        await supabase
-          .from('users')
-          .update({
-            current_plan: newPlanInfo.name,
-            credits: newCredits,
-            subscription_status: 'active',
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', user.id)
-
-        // Return success with redirect to dashboard
-        return new Response(
-          JSON.stringify({
-            success: true,
-            upgraded: true,
-            redirect_url: '/dashboard',
-            message: 'Plan upgraded successfully with prorated credits!'
-          }),
-          {
-            status: 200, // Ensure CORS headers are always returned
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        console.log('🔄 User has active subscription, will use Subscription Schedule for upgrade')
+        
+        // Find existing customer and subscription
+        let customer
+        if (userProfile.stripe_customer_id) {
+          try {
+            customer = await stripe.customers.retrieve(userProfile.stripe_customer_id)
+          } catch (error) {
+            console.warn('Customer not found, will search by email')
           }
-        )
+        }
+        
+        if (!customer) {
+          const customers = await stripe.customers.list({ email: user.email, limit: 1 })
+          if (customers.data.length > 0) {
+            customer = customers.data[0]
+          }
+        }
+        
+        if (customer) {
+          // Try to use existing subscription schedule or create one
+          const result = await createOrUpdateSubscriptionSchedule(
+            stripe, 
+            customer, 
+            userProfile.stripe_subscription_schedule_id, 
+            priceId, 
+            newPlanInfo.name
+          )
+          
+          if (result.success) {
+            // Update user with schedule information
+            await supabase
+              .from('users')
+              .update({
+                stripe_subscription_schedule_id: result.scheduleId,
+                stripe_subscription_id: result.subscriptionId,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', user.id)
+            
+            return new Response(
+              JSON.stringify({
+                success: true,
+                upgraded: result.isUpgrade,
+                redirect_url: '/dashboard',
+                message: result.message
+              }),
+              { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            )
+          } else {
+            return new Response(
+              JSON.stringify({ success: false, error: result.error }),
+              { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            )
+          }
+        }
       }
     }
 
@@ -332,7 +358,10 @@ Deno.serve(async (req: Request) => {
       // Update user with Stripe customer ID
       await supabase
         .from('users') // Use Supabase client
-        .update({ stripe_customer_id: customerId })
+        .update({ 
+          stripe_customer_id: customerId,
+          updated_at: new Date().toISOString()
+        })
         .eq('id', user.id)
     }
 
@@ -360,7 +389,8 @@ Deno.serve(async (req: Request) => {
       sessionConfig.subscription_data = {
         metadata: {
           user_id: user.id,
-          user_email: user.email
+          user_email: user.email,
+          convert_to_schedule: 'true'
         }
       }
     }

@@ -319,20 +319,24 @@ Deno.serve(async (req: Request) => {
                         current_plan: newPlan,
                         stripe_customer_id: session.customer,
                         stripe_subscription_id: stripeSubscriptionId || null,
+                        stripe_subscription_schedule_id: stripeSubscriptionScheduleId || null,
                         subscription_period_end: subscriptionPeriodEnd,
-                        updated_at: safeCurrentTimestamp()
+                        updated_at: safeCurrentTimestamp(),
+                        last_webhook_update: safeCurrentTimestamp(),
+                        webhook_processed: true
                     };
 
-                    if (stripeSubscriptionScheduleId) {
-                        updateData.stripe_subscription_schedule_id = stripeSubscriptionScheduleId;
-                    }
 
                     console.log('💾 Update data to DB:', JSON.stringify(updateData, null, 2));
 
                     try {
                         const { data: updatedUser, error: updateError } = await supabase
                             .from('users')
-                            .update(updateData)
+                            .update({
+                              ...updateData,
+                              last_webhook_update: safeCurrentTimestamp(),
+                              webhook_processed: true
+                            })
                             .eq('id', user.id)
                             .select()
                             .single();
@@ -403,7 +407,11 @@ Deno.serve(async (req: Request) => {
                         
                         const { data: updatedUser, error: updateError } = await supabase
                             .from('users')
-                            .update(updateData)
+                            .update({
+                              ...updateData,
+                              last_webhook_update: safeCurrentTimestamp(),
+                              webhook_processed: true
+                            })
                             .eq('id', user.id)
                             .select()
                             .single();
@@ -472,7 +480,11 @@ Deno.serve(async (req: Request) => {
                 
                 const { error: updateError } = await supabase
                     .from('users')
-                    .update(updateData)
+                    .update({
+                      ...updateData,
+                      last_webhook_update: safeCurrentTimestamp(),
+                      webhook_processed: true
+                    })
                     .eq('id', user.id);
                     
                 if (updateError) {

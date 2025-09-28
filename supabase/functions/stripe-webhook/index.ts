@@ -111,7 +111,9 @@ Deno.serve(async (req: Request) => {
             .from('users')
             .update({
               stripe_customer_id: customerId,
-              updated_at: new Date().toISOString()
+              updated_at: new Date().toISOString(),
+              last_webhook_update: new Date().toISOString(),
+              webhook_processed: true
             })
             .eq('id', user.id)
         }
@@ -131,7 +133,9 @@ Deno.serve(async (req: Request) => {
               .from('users')
               .update({
                 credits: newCredits,
-                updated_at: new Date().toISOString()
+                updated_at: new Date().toISOString(),
+                last_webhook_update: new Date().toISOString(),
+                webhook_processed: true
               })
               .eq('id', user.id)
 
@@ -184,7 +188,9 @@ Deno.serve(async (req: Request) => {
             credits: newCredits,
             subscription_status: status === 'active' ? 'active' : 'inactive',
             subscription_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
+            last_webhook_update: new Date().toISOString(),
+            webhook_processed: true
           })
           .eq('id', user.id)
 
@@ -218,7 +224,9 @@ Deno.serve(async (req: Request) => {
             credits: 20, // Reset to free tier credits
             subscription_status: 'inactive',
             subscription_period_end: null,
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
+            last_webhook_update: new Date().toISOString(),
+            webhook_processed: true
           })
           .eq('id', user.id)
 
@@ -252,7 +260,9 @@ Deno.serve(async (req: Request) => {
           .from('users')
           .update({
             credits: planCredits,
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
+            last_webhook_update: new Date().toISOString(),
+            webhook_processed: true
           })
           .eq('id', user.id)
 
@@ -283,7 +293,9 @@ Deno.serve(async (req: Request) => {
           .from('users')
           .update({
             subscription_status: 'past_due',
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
+            last_webhook_update: new Date().toISOString(),
+            webhook_processed: true
           })
           .eq('id', user.id)
 

@@ -76,6 +76,24 @@ Deno.serve(async (req: Request) => {
     
     const userRecord = users[0]
 
+    // Check for recent webhook update (protection mechanism)
+    if (userRecord.last_webhook_update) {
+      const lastWebhookTime = new Date(userRecord.last_webhook_update).getTime()
+      const tenMinutesAgo = Date.now() - (10 * 60 * 1000)
+      
+      if (lastWebhookTime > tenMinutesAgo) {
+        console.log('ℹ️ Recent webhook update detected, skipping sync to avoid conflicts')
+        return new Response(
+          JSON.stringify({
+            success: true,
+            user: userRecord,
+            message: 'Recent webhook update detected - sync skipped to avoid conflicts',
+            last_webhook_update: userRecord.last_webhook_update
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+    }
     console.log('=== EXISTING USER RECORD FOUND ===')
     console.log('User ID:', userRecord.id)
     console.log('Current credits:', userRecord.credits)

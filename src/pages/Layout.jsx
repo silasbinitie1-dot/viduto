@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
+import SEOHead from '@/components/SEOHead';
 
 export default function Layout() {
   useEffect(() => {
@@ -24,5 +25,10 @@ export default function Layout() {
     }
   }, []);
 
-  return <Outlet />;
+  return (
+    <>
+      <SEOHead />
+      <Outlet />
+    </>
+  );
 }
