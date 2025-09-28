@@ -98,20 +98,15 @@ Deno.serve(async (req: Request) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
-    return new Response(
-      JSON.stringify({
-        success: true,
-        message: 'Callback processed successfully',
-        video_id: video_id,
-        chat_id: chat_id,
-        status: status
-      }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
-    )
 
     if (!chatId) {
+      console.error('Missing chat_id parameter')
+      return new Response(
+        JSON.stringify({ error: 'Missing chat_id' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
     // Find and update the video record using service role
     console.log(`Looking for video with video_id: ${videoId}`)
     const { data: videos, error: videoFindError } = await supabase
@@ -199,7 +194,6 @@ Deno.serve(async (req: Request) => {
     
     // Create completion messages using service role
     console.log(`Creating completion messages for chat ${chatId}`)
-      console.error('Missing chat_id parameter')
     // 1) Video message first (so the video appears before any text in chat)
     const { error: videoMessageError } = await supabase
       .from('message')
@@ -215,16 +209,16 @@ Deno.serve(async (req: Request) => {
           video_only: true
         }
       })
-      return new Response(
+    
     if (videoMessageError) {
       console.error('Failed to create video message:', videoMessageError.message)
     }
-        JSON.stringify({ error: 'Missing chat_id' }),
+    
     // 2) Text message after the video
     const completionMessage = `🎉 **Your video is ready!**
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+
 Your professional 30-second video has been created successfully. You can download it, share it on social media, or request revisions (costs 2.5 credits).`
-      )
+    
     const { error: textMessageError } = await supabase
       .from('message')
       .insert({
@@ -236,16 +230,16 @@ Your professional 30-second video has been created successfully. You can downloa
           video_id: videoId
         }
       })
-    }
+    
     if (textMessageError) {
       console.error('Failed to create text message:', textMessageError.message)
     }
-  } catch (error) {
+    
     // 3) Optional revision guidance message
     const revisionGuidance = `**Want to make changes?**
-    console.error('❌ CRITICAL ERROR in n8n-video-callback:', error)
+
 Describe any adjustments you'd like, and I'll create a revised version for you. It takes about 10 minutes to generate. Each revision costs 2.5 credits.`
-    console.error('❌ Error message:', error?.message || 'No error message')
+    
     const { error: revisionMessageError } = await supabase
       .from('message')
       .insert({
@@ -257,7 +251,7 @@ Describe any adjustments you'd like, and I'll create a revised version for you. 
           parent_video_id: videoId
         }
       })
-    console.error('❌ Error stack trace:', error?.stack || 'No stack trace')
+    
     if (revisionMessageError) {
       console.error('Failed to create revision message:', revisionMessageError.message)
     }
@@ -287,19 +281,37 @@ Describe any adjustments you'd like, and I'll create a revised version for you. 
     
     return new Response(
       JSON.stringify({
+        success: true,
+        message: 'Callback processed successfully',
+        video_id: videoId,
+        chat_id: chatId,
+        status: 'completed'
+      }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    )
+    
+  } catch (error) {
+    console.error('❌ CRITICAL ERROR in n8n-video-callback:', error)
+    console.error('❌ Error message:', error?.message || 'No error message')
+    console.error('❌ Error stack trace:', error?.stack || 'No stack trace')
+    console.error('=== CALLBACK ERROR ===')
+    console.error('Error processing callback:', error)
+    console.error('Stack trace:', error.stack)
+    
+    return new Response(
+      JSON.stringify({
         success: false,
         error: error.message || 'Internal server error',
         video_id: videoId,
-        error: 'Internal server error',
         details: error.message
-        status: 'completed'
+      }),
+      {
         status: 500,
-        status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     )
   }
 })
-    console.error('=== CALLBACK ERROR ===')
-    console.error('Error processing callback:', error)
-    console.error('Stack trace:', error.stack)
