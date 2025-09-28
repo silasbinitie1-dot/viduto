@@ -21,6 +21,7 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
   const [editingBrief, setEditingBrief] = useState(false);
   const [briefText, setBriefText] = useState('');
   const [showGeneratingBrief, setShowGeneratingBrief] = useState(false);
+ const [updatingBrief, setUpdatingBrief] = useState(false);
   const fileInputRef = useRef(null);
   const messagesEndRef = useRef(null);
 
@@ -131,8 +132,18 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
         brief: generatedBrief
       });
 
+     // Create system approval instruction message
+     const approvalMessage = await Message.create({
+       chat_id: chat.id,
+       message_type: 'system',
+       content: 'Please carefully read the Video Plan before you generate the video, check if it fits your vision and request changes if it doesn\'t until it feels perfect!\n\n✅ Ready to Create?',
+       metadata: { 
+         is_approval_instruction: true,
+         created_at: new Date().toISOString()
+       }
+     });
       // Update local state
-      setMessages(prev => [...prev, briefMessage]);
+     setMessages(prev => [...prev, briefMessage, approvalMessage]);
       setCurrentBrief(generatedBrief);
       setBriefText(generatedBrief);
       setCurrentChat(prev => ({ ...prev, workflow_state: 'awaiting_approval', brief: generatedBrief }));
@@ -147,6 +158,73 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
     }
   };
 
+ // Handle brief update requests
+ const handleUpdateBrief = async (updateRequest) => {
+   setUpdatingBrief(true);
+   
+   try {
+     // Get the current brief
+     const currentBriefText = currentBrief || briefText;
+     
+     // Create a prompt for updating the brief
+     const updatePrompt = `Update this video plan based on the user's request:
+ 
+ CURRENT VIDEO PLAN:
+ ${currentBriefText}
+ 
+ USER'S UPDATE REQUEST:
+ ${updateRequest}
+ 
+ Please update the video plan accordingly while maintaining the same format and structure. Keep all the good parts and only change what the user requested.`;
+ 
+     // Call LLM to update brief
+     const { InvokeLLM } = await import('@/api/integrations');
+     const llmResponse = await InvokeLLM({
+       prompt: updatePrompt,
+       max_tokens: 2000
+     });
+ 
+     const updatedBrief = llmResponse.response;
+ 
+     // Update chat with new brief
+     const { Chat } = await import('@/api/entities');
+     await Chat.update(chatId, {
+       brief: updatedBrief
+     });
+ 
+     // Update the existing brief message in local state
+     setMessages(prev => prev.map(msg => 
+       msg.metadata?.is_brief 
+         ? { ...msg, content: updatedBrief, metadata: { ...msg.metadata, brief_updated_at: new Date().toISOString() } }
+         : msg
+     ));
+ 
+     // Create assistant response
+     const { Message } = await import('@/api/entities');
+     const responseMessage = await Message.create({
+       chat_id: chatId,
+       message_type: 'assistant',
+       content: '✅ Video plan updated! Please review the changes above.',
+       metadata: { 
+         is_update_response: true,
+         updated_at: new Date().toISOString()
+       }
+     });
+ 
+     setMessages(prev => [...prev, responseMessage]);
+     setCurrentBrief(updatedBrief);
+     setBriefText(updatedBrief);
+     setCurrentChat(prev => ({ ...prev, brief: updatedBrief }));
+     
+     toast.success('Video plan updated successfully!');
+   } catch (error) {
+     console.error('Error updating brief:', error);
+     toast.error('Failed to update video plan. Please try again.');
+   } finally {
+     setUpdatingBrief(false);
+   }
+ };
+ 
   // Handle brief editing
   const handleEditBrief = () => {
     setEditingBrief(true);
@@ -731,7 +809,7 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
                         <div className="mt-6">
                           <Button
                             onClick={handleApproveBrief}
-                            disabled={loading || updatingBrief}
+                           disabled={loading}
                             className="bg-orange-500 text-white hover:bg-orange-600 gap-2 px-8 py-3 text-base font-medium"
                           >
                             {loading ? (
@@ -739,7 +817,7 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
                             ) : (
                               <Play className="w-4 h-4" />
                             )}
-                            Approve and start production (10 credits)
+                           Approve and start production
                           </Button>
                         </div>
                       )}
@@ -765,6 +843,19 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
                     </div>
                   </div>
                 )}
+
+               {/* Update Response Messages */}
+               {message.message_type === 'assistant' && message.metadata?.is_update_response && (
+                 <div className="flex justify-start">
+                   <div className={`max-w-[80%] rounded-2xl p-4 ${
+                     darkMode ? 'bg-green-900/20 border border-green-700' : 'bg-green-50 border border-green-200'
+                   }`}>
+                     <p className={`font-light ${darkMode ? 'text-green-300' : 'text-green-700'}`}>
+                       {message.content}
+                     </p>
+                   </div>
+                 </div>
+               )}
 
                 {/* Error Messages */}
                 {message.message_type === 'assistant' && message.metadata?.is_error && (

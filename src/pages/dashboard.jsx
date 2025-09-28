@@ -190,6 +190,7 @@ export default function Dashboard() {
 
         const chatIdFromUrl = urlParams.get('chat');
         const fromHomepage = urlParams.get('from') === 'homepage';
+       const pendingDataStr = sessionStorage.getItem('pendingChatData');
 
         if (chatIdFromUrl) {
           const userChats = await Chat.filter({}, '-updated_at');
