@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Menu, Clock, Building, Check, X, Camera, Wand2, Edit, Upload, Play } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
+import { supabase } from '@/lib/supabase';
 import { User } from '@/api/entities';
 import { Button } from '@/components/ui/button';
 import { AuthModal } from '../components/AuthModal';
@@ -51,6 +52,13 @@ export default function Home() {
   useEffect(() => {
     const checkUser = async () => {
       try {
+        // Wait for auth state to be ready
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          setUser(null);
+          return;
+        }
+        
         const currentUser = await User.me();
         setUser(currentUser);
       } catch (e) {

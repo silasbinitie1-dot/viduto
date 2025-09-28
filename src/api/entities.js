@@ -195,12 +195,6 @@ export const User = {
   },
 
   logout: async () => {
-    const { error } = await supabase.auth.signOut()
-    if (error) {
-      throw new Error(`Logout failed: ${error.message}`)
-    }
-  },
-
   update: async (data) => {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     

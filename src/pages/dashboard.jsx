@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Menu, X, User as UserIcon, CreditCard, LogOut, Plus, MessageSquare, HelpCircle, Sun, Moon, Gift, Zap, Settings } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
+import { supabase } from '@/lib/supabase';
 import { User, Chat, Message } from '@/api/entities';
 import { UploadFile } from '@/api/integrations';
 import ChatInterface from '../components/ChatInterface'; // 🔧 תוקן כאן
@@ -152,6 +153,14 @@ export default function Dashboard() {
     const initialize = async () => {
       setLoading(true);
       try {
+        // Check for authentication state change (after OAuth redirect)
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) {
+          console.log('No session found, redirecting to home');
+          navigate('/home');
+          return;
+        }
+        
         await syncUserWithStripe();
 
         const currentUser = await User.me();
