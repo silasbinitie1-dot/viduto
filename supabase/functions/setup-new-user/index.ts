@@ -6,12 +6,6 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-interface SetupUserRequest {
-  userId: string
-  email: string
-  fullName?: string
-}
-
 Deno.serve(async (req: Request) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -50,94 +44,160 @@ Deno.serve(async (req: Request) => {
       )
     }
 
-    // Check if user profile already exists
-    const { data: existingProfile, error: profileError } = await supabase
+    console.log(`=== SETUP NEW USER START ===`)
+    console.log(`User: ${user.email}`)
+    console.log('Timestamp:', new Date().toISOString())
+
+    // Get user profile
+    const { data: users, error: userError } = await supabase
       .from('users')
       .select('*')
-      .eq('id', user.id)
-      .single()
-
-    if (existingProfile) {
-      // User already exists, return existing profile
+      .eq('email', user.email)
+    
+    if (userError) {
+      console.error('Error fetching user:', userError.message)
       return new Response(
-        JSON.stringify({
-          success: true,
-          user: existingProfile,
-          message: 'User profile already exists'
-        }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      )
-    }
-
-    // Create new user profile
-    const { data: newUser, error: createError } = await supabase
-      .from('users')
-      .insert({
-        id: user.id,
-        email: user.email,
-        full_name: user.user_metadata?.full_name || user.email.split('@')[0],
-        credits: 20.0, // Set initial credits to 20
-        subscription_status: 'inactive',
-        role: 'user'
-      })
-      .select()
-      .single()
-
-    if (createError) {
-      console.error('Error creating user profile:', createError)
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Failed to create user profile',
-          details: createError.message
-        }),
+        JSON.stringify({ success: false, error: 'Failed to fetch user profile' }),
         { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
+    
+    if (users && users.length > 0) {
+      const userRecord = users[0]
+      
+      console.log(`=== EXISTING USER RECORD FOUND ===`)
+      console.log('User ID:', userRecord.id)
+      console.log('Current credits:', userRecord.credits)
+      console.log('Subscription status:', userRecord.subscription_status)
+      console.log('Current plan:', userRecord.current_plan)
+      console.log('Stripe customer ID:', userRecord.stripe_customer_id)
+      
+      // Strong paid indicators
+      const hasActiveSubscription = userRecord.subscription_status === 'active'
+      const hasAnyPaidPlan = !!(userRecord.current_plan && userRecord.current_plan !== 'Free')
+      const hasStripeCustomerId = !!(userRecord.stripe_customer_id)
 
-    // Log successful user creation
-    await supabase
-      .from('system_log')
-      .insert({
-        operation: 'user_created',
-        entity_type: 'user',
-        entity_id: user.id,
-        user_email: user.email,
-        status: 'success',
-        message: 'New user profile created successfully',
-        metadata: {
-          initial_credits: 20,
-          signup_method: 'google_oauth'
-        }
-      })
-
-    return new Response(
-      JSON.stringify({
-        success: true,
-        user: newUser,
-        message: 'User profile created successfully'
-      }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      console.log('=== PROTECTION ANALYSIS ===')
+      console.log('hasActiveSubscription:', hasActiveSubscription)
+      console.log('hasAnyPaidPlan:', hasAnyPaidPlan)
+      console.log('hasStripeCustomerId:', hasStripeCustomerId)
+      
+      // ABSOLUTE PROTECTION: never touch credits when any paid indicator is present
+      if (hasActiveSubscription || hasAnyPaidPlan || hasStripeCustomerId) {
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            message: 'Paid subscription indicators present - credits preserved', 
+            credits: userRecord.credits,
+            user: userRecord,
+            protection_reason: 'paid_subscription_detected'
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
       }
-    )
+      
+      // Only clearly free users with no credits get baseline 20
+      const needsInitialCredits = (
+        (!userRecord.subscription_status || userRecord.subscription_status === 'inactive') &&
+        (!userRecord.current_plan || userRecord.current_plan === '' || userRecord.current_plan === null || userRecord.current_plan === 'Free') &&
+        !userRecord.stripe_customer_id &&
+        (userRecord.credits == null || userRecord.credits === 0 || userRecord.credits === undefined)
+      )
+      
+      if (needsInitialCredits) {
+        const { data: updatedUser, error: updateError } = await supabase
+          .from('users')
+          .update({ 
+            credits: 20,
+            subscription_status: 'inactive',
+            current_plan: 'Free',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', userRecord.id)
+          .select()
+          .single()
+        
+        if (updateError) {
+          console.error('Error updating user credits:', updateError.message)
+          return new Response(
+            JSON.stringify({ success: false, error: 'Failed to update user credits' }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+        
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            message: 'Added 20 credits to existing free user', 
+            credits: 20,
+            user: updatedUser
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      } else {
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            message: 'User already has credits or paid plan - preserved', 
+            credits: userRecord.credits,
+            user: userRecord
+          }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+    } else {
+      // Create user record with 20 credits if it doesn't exist
+      console.log('🆕 === CREATING NEW USER RECORD ===')
+      console.log('Creating new user record with 20 credits')
+      
+      const { data: newUser, error: createError } = await supabase
+        .from('users')
+        .insert({
+          id: user.id,
+          email: user.email,
+          full_name: user.user_metadata?.full_name || user.email.split('@')[0],
+          credits: 20,
+          subscription_status: 'inactive',
+          current_plan: 'Free'
+        })
+        .select()
+        .single()
+      
+      if (createError) {
+        console.error('Error creating user:', createError.message)
+        return new Response(
+          JSON.stringify({ success: false, error: 'Failed to create user profile' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      
+      console.log(`✅ Created new user record for ${user.email} with 20 credits`)
+      
+      return new Response(
+        JSON.stringify({ 
+          success: true, 
+          message: 'User record created with 20 credits', 
+          credits: 20,
+          user: newUser,
+          was_new_user: true
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
 
   } catch (error) {
-    console.error('Error in setup-new-user:', error)
+    console.error('❌ === ERROR IN SETUP NEW USER ===')
+    console.error('Error setting up user:', error)
+    console.error('Error message:', error.message)
+    console.error('Error stack:', error.stack)
     
     return new Response(
-      JSON.stringify({
+      JSON.stringify({ 
         success: false,
-        error: error.message || 'Internal server error'
+        error: 'Failed to setup user', 
+        details: error.message 
       }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }
 })
