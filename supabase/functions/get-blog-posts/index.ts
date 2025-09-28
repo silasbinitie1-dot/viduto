@@ -170,7 +170,7 @@ Deno.serve(async (req: Request) => {
 
     // This is a public endpoint - no authentication required
     const body = await req.json().catch(() => ({}))
-    const fileUrl = body?.fileUrl || `${Deno.env.get('SUPABASE_URL')}/storage/v1/object/public/blog-content/blog-posts.html`
+    const fileUrl = body?.fileUrl || 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68b4aa46f5d6326ab93c3ed0/e034dd6a9_12ProfessionalSEOOptimizedBlogPostsforViduto.html'
 
     const res = await fetch(fileUrl)
     if (!res.ok) {

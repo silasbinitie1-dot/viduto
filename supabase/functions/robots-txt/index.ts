@@ -14,12 +14,11 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const baseUrl = Deno.env.get('VITE_APP_BASE_URL') || 'https://viduto.com'
     const robotsTxt = `User-agent: *
 Allow: /
 
 # Sitemap
-Sitemap: ${baseUrl}/sitemap.xml
+Sitemap: https://viduto.com/sitemap.xml
 
 # Disallow admin and private areas
 Disallow: /dashboard

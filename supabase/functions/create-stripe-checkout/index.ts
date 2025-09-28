@@ -376,8 +376,8 @@ Deno.serve(async (req: Request) => {
         },
       ],
       mode: mode,
-      success_url: `${req.headers.get('origin') || Deno.env.get('VITE_APP_BASE_URL') || 'http://localhost:5173'}/dashboard?success=true`,
-      cancel_url: `${req.headers.get('origin') || Deno.env.get('VITE_APP_BASE_URL') || 'http://localhost:5173'}/dashboard`,
+      success_url: `${req.headers.get('origin') || 'https://viduto-tsng.bolt.host'}/dashboard?success=true`,
+      cancel_url: `${req.headers.get('origin') || 'https://viduto-tsng.bolt.host'}/dashboard`,
       metadata: {
         user_id: user.id,
         user_email: user.email

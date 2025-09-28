@@ -45,7 +45,7 @@ export default function EnterprisePage() {
       <header className="fixed top-0 inset-x-0 z-50">
         <div className="max-w-5xl mx-2 md:mx-auto p-2 px-4 mt-2 bg-white/70 backdrop-blur-md rounded-xl flex items-center justify-between shadow-sm">
           <Link to="/home" className="flex items-center gap-2">
-            <Logo size={32} className="w-8 h-8" />
+            <img src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/69a552913_vidutonobg.png" alt="Viduto Logo" className="w-8 h-8" />
             <span className="text-2xl font-light text-gray-900 tracking-tight hover:text-gray-700 transition-colors">
               Viduto
             </span>

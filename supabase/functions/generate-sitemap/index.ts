@@ -14,46 +14,45 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const baseUrl = Deno.env.get('VITE_APP_BASE_URL') || 'https://viduto.com'
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 <url>
-<loc>${baseUrl}/</loc>
+<loc>https://viduto.com/</loc>
 <changefreq>weekly</changefreq>
 <priority>1.0</priority>
 </url>
 <url>
-<loc>${baseUrl}/home</loc>
+<loc>https://viduto.com/home</loc>
 <changefreq>weekly</changefreq>
 <priority>1.0</priority>
 </url>
 <url>
-<loc>${baseUrl}/features</loc>
+<loc>https://viduto.com/features</loc>
 <changefreq>weekly</changefreq>
 <priority>0.8</priority>
 </url>
 <url>
-<loc>${baseUrl}/pricing</loc>
+<loc>https://viduto.com/pricing</loc>
 <changefreq>weekly</changefreq>
 <priority>0.8</priority>
 </url>
 <url>
-<loc>${baseUrl}/enterprise</loc>
+<loc>https://viduto.com/enterprise</loc>
 <changefreq>weekly</changefreq>
 <priority>0.8</priority>
 </url>
 <url>
-<loc>${baseUrl}/blog</loc>
+<loc>https://viduto.com/blog</loc>
 <changefreq>weekly</changefreq>
 <priority>0.8</priority>
 </url>
 <url>
-<loc>${baseUrl}/terms</loc>
+<loc>https://viduto.com/terms</loc>
 <changefreq>monthly</changefreq>
 <priority>0.5</priority>
 </url>
 <url>
-<loc>${baseUrl}/privacy</loc>
+<loc>https://viduto.com/privacy</loc>
 <changefreq>monthly</changefreq>
 <priority>0.5</priority>
 </url>
@@ -70,11 +69,10 @@ Deno.serve(async (req: Request) => {
     console.error('Error generating sitemap:', error);
     
     // Return minimal sitemap on error
-    const baseUrl = Deno.env.get('VITE_APP_BASE_URL') || 'https://viduto.com'
     const fallbackXml = `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 <url>
-<loc>${baseUrl}/</loc>
+<loc>https://viduto.com/</loc>
 <changefreq>weekly</changefreq>
 <priority>1.0</priority>
 </url>
