@@ -12,7 +12,7 @@ import { FaqsSection } from '../components/FaqsSection';
 import { CtaSection } from '../components/CtaSection';
 import { Footer } from '../components/Footer';
 import { sendFacebookConversionEvent } from '@/functions/sendFacebookConversionEvent';
-import { toast } from 'sonner';
+import { Toaster, toast } from 'react-hot-toast';
 
 // Helper function to convert file to base64
 const fileToBase64 = (file) => {
@@ -173,9 +173,8 @@ export default function Home() {
         sessionStorage.setItem('pendingChatData', JSON.stringify(pendingData));
         setShowAuthModal(true);
       } else {
-        const { Chat } = await import('@/entities/Chat');
-        const { Message } = await import('@/entities/Message');
-        const { UploadFile } = await import('@/integrations/Core');
+        const { Chat, Message } = await import('@/api/entities');
+        const { UploadFile } = await import('@/api/integrations');
 
         const newChat = await Chat.create({
           title: 'Creating brief...',

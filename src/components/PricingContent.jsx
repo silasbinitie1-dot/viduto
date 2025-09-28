@@ -6,10 +6,9 @@ import { cn } from '@/lib/utils';
 import { User } from '@/entities/User';
 import { useNavigate } from 'react-router-dom';
 import { AuthModal } from '@/components/AuthModal';
-import { sendFacebookConversionEvent } from '@/api/functions';
+import { sendFacebookConversionEvent } from '@/functions/sendFacebookConversionEvent';
 import { useToast } from '@/components/ui/use-toast';
-import { createStripeCheckoutSession } from '@/functions/createStripeCheckoutSession';
-import { createStripeCustomerPortal } from '@/functions/createStripeCustomerPortal';
+import { createStripeCheckoutSession, createStripeCustomerPortal } from '@/api/functions';
 
 
 const pricingPlans = [
