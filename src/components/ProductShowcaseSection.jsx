@@ -26,7 +26,7 @@ export const ProductShowcaseSection = ({ onAuthRequired }) => {
                   {/* Main product demo image */}
                   <div className="bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl shadow-2xl overflow-hidden border border-gray-200">
                     <img
-                      src="https://images.pexels.com/photos/3184465/pexels-photo-3184465.jpeg?auto=compress&cs=tinysrgb&w=800"
+                      src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/7f7b45434_tEsRrMtY4i5elqlBe_AsS.jpg"
                       alt="Viduto dashboard interface demonstration"
                       className="w-full h-auto object-cover" />
 
@@ -76,8 +76,8 @@ export const ProductShowcaseSection = ({ onAuthRequired }) => {
                 <div className="relative">
                   {/* Main product demo image */}
                   <div className="bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl shadow-2xl overflow-hidden border border-gray-200">
-                    <img 
-                      src="https://images.pexels.com/photos/3184465/pexels-photo-3184465.jpeg?auto=compress&cs=tinysrgb&w=800"
+                    <img
+                      src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/211d90d64_VAFYo1QHQprUixeRsaddV.jpg"
                       alt="Product demonstration interface"
                       className="w-full h-auto object-cover" />
 
@@ -140,8 +140,8 @@ export const ProductShowcaseSection = ({ onAuthRequired }) => {
                 <div className="relative">
                   {/* Main product demo image */}
                   <div className="bg-gradient-to-br from-gray-100 to-gray-200 rounded-2xl shadow-2xl overflow-hidden border border-gray-200">
-                    <img 
-                      src="https://images.pexels.com/photos/3184465/pexels-photo-3184465.jpeg?auto=compress&cs=tinysrgb&w=800"
+                    <img
+                      src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/4857b8c90_1stillustraion.jpg"
                       alt="AI generated product scenes interface"
                       className="w-full h-auto object-cover" />
 
