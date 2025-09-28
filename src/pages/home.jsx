@@ -237,7 +237,6 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-white" style={{ '--header-bg': 'rgba(255, 255, 255, 0.7)', '--text-dark': '#333', '--text-medium': '#666', '--text-light': '#999', '--accent-orange': '#F97316', '--accent-primary': '#60A5FA', '--accent-secondary': '#818CF8', '--surface-elevated': '#F3F4F6', '--input-border': '#E5E7EB', '--accent-success': '#10B981' }}>
-      <Toaster position="top-center" reverseOrder={false} />
       
       {/* Header */}
       <header className={`fixed top-0 inset-x-0 z-50 transition-all duration-300`}>
