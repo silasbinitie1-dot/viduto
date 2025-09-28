@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import Stripe from 'npm:stripe@16.12.0'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -52,6 +53,11 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    // Initialize Stripe
+    const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') ?? '', {
+      apiVersion: '2024-06-20',
+    })
+
     // Initialize Supabase client
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -148,15 +154,63 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    // For new subscriptions or one-time purchases, return mock Stripe URL
-    // In production, this would create actual Stripe checkout sessions
-    const checkoutUrl = `https://checkout.stripe.com/pay/mock-${priceId}-${mode}-${quantity}`
+    // Create or get Stripe customer
+    let customerId = userProfile.stripe_customer_id
+
+    if (!customerId) {
+      const customer = await stripe.customers.create({
+        email: user.email,
+        name: userProfile.full_name || user.email,
+        metadata: {
+          supabase_user_id: user.id
+        }
+      })
+      
+      customerId = customer.id
+      
+      // Update user with Stripe customer ID
+      await supabase
+        .from('users')
+        .update({ stripe_customer_id: customerId })
+        .eq('id', user.id)
+    }
+
+    // Create Stripe checkout session
+    const sessionConfig: any = {
+      customer: customerId,
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price: priceId,
+          quantity: quantity,
+        },
+      ],
+      mode: mode,
+      success_url: `${req.headers.get('origin') || 'https://viduto-tsng.bolt.host'}/dashboard?success=true`,
+      cancel_url: `${req.headers.get('origin') || 'https://viduto-tsng.bolt.host'}/dashboard`,
+      metadata: {
+        user_id: user.id,
+        user_email: user.email
+      }
+    }
+
+    // Add subscription-specific configuration
+    if (mode === 'subscription') {
+      sessionConfig.subscription_data = {
+        metadata: {
+          user_id: user.id,
+          user_email: user.email
+        }
+      }
+    }
+
+    const session = await stripe.checkout.sessions.create(sessionConfig)
     
     return new Response(
       JSON.stringify({
         success: true,
         data: {
-          url: checkoutUrl
+          url: session.url
         }
       }),
       {

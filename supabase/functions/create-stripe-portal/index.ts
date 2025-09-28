@@ -1,8 +1,9 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import Stripe from 'npm:stripe@16.12.0'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
@@ -16,6 +17,11 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    // Initialize Stripe
+    const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') ?? '', {
+      apiVersion: '2024-06-20',
+    })
+
     // Initialize Supabase client
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -65,14 +71,17 @@ Deno.serve(async (req: Request) => {
       )
     }
 
-    // In production, this would create actual Stripe customer portal
-    const portalUrl = `https://billing.stripe.com/p/session/mock-${userProfile.stripe_customer_id}`
+    // Create Stripe customer portal session
+    const portalSession = await stripe.billingPortal.sessions.create({
+      customer: userProfile.stripe_customer_id,
+      return_url: `${req.headers.get('origin') || 'https://viduto-tsng.bolt.host'}/dashboard`,
+    })
     
     return new Response(
       JSON.stringify({
         success: true,
         data: {
-          url: portalUrl
+          url: portalSession.url
         }
       }),
       {

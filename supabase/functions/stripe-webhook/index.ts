@@ -1,4 +1,5 @@
 import { createClient } from 'npm:@supabase/supabase-js@2'
+import Stripe from 'npm:stripe@16.12.0'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -47,25 +48,51 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
+    // Initialize Stripe
+    const stripe = new Stripe(Deno.env.get('STRIPE_SECRET_KEY') ?? '', {
+      apiVersion: '2024-06-20',
+    })
+
     // Initialize Supabase client with service role
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // In production, verify Stripe webhook signature here
-    const stripeSignature = req.headers.get('stripe-signature')
+    // Verify webhook signature
+    const signature = req.headers.get('stripe-signature')
+    const webhookSecret = Deno.env.get('STRIPE_WEBHOOK_SECRET')
     
-    const event = await req.json()
-    
-    console.log('Stripe webhook event:', event.type)
+    if (!signature || !webhookSecret) {
+      return new Response(
+        JSON.stringify({ error: 'Missing webhook signature or secret' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const body = await req.text()
+    let event: Stripe.Event
+
+    try {
+      event = stripe.webhooks.constructEvent(body, signature, webhookSecret)
+    } catch (err) {
+      console.error('Webhook signature verification failed:', err)
+      return new Response(
+        JSON.stringify({ error: 'Invalid signature' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    console.log('Processing Stripe webhook event:', event.type)
 
     switch (event.type) {
       case 'checkout.session.completed': {
-        const session = event.data.object
-        const customerId = session.customer
+        const session = event.data.object as Stripe.Checkout.Session
+        const customerId = session.customer as string
         const customerEmail = session.customer_details?.email
         
+        console.log('Checkout completed for customer:', customerId, customerEmail)
+
         // Find user by email
         const { data: user, error: userError } = await supabase
           .from('users')
@@ -78,25 +105,52 @@ Deno.serve(async (req: Request) => {
           break
         }
 
-        // Update user with Stripe customer ID
-        await supabase
-          .from('users')
-          .update({
-            stripe_customer_id: customerId,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', user.id)
+        // Update user with Stripe customer ID if not already set
+        if (!user.stripe_customer_id) {
+          await supabase
+            .from('users')
+            .update({
+              stripe_customer_id: customerId,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', user.id)
+        }
+
+        // Handle one-time credit purchases
+        if (session.mode === 'payment') {
+          const lineItems = await stripe.checkout.sessions.listLineItems(session.id)
+          const creditPurchase = lineItems.data.find(item => 
+            item.price?.id === 'price_1RxTVjDaWkYYoAByvUfEwWY9'
+          )
+          
+          if (creditPurchase) {
+            const creditsToAdd = (creditPurchase.quantity || 1) * 10
+            const newCredits = (user.credits || 0) + creditsToAdd
+
+            await supabase
+              .from('users')
+              .update({
+                credits: newCredits,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', user.id)
+
+            console.log(`Added ${creditsToAdd} credits to user ${user.email}`)
+          }
+        }
 
         break
       }
 
       case 'customer.subscription.created':
       case 'customer.subscription.updated': {
-        const subscription = event.data.object
-        const customerId = subscription.customer
+        const subscription = event.data.object as Stripe.Subscription
+        const customerId = subscription.customer as string
         const priceId = subscription.items.data[0]?.price?.id
         const status = subscription.status
         
+        console.log('Subscription event:', { customerId, priceId, status })
+
         // Find user by Stripe customer ID
         const { data: user, error: userError } = await supabase
           .from('users')
@@ -134,13 +188,16 @@ Deno.serve(async (req: Request) => {
           })
           .eq('id', user.id)
 
+        console.log(`Updated user ${user.email} to ${planInfo.name} plan with ${newCredits} credits`)
         break
       }
 
       case 'customer.subscription.deleted': {
-        const subscription = event.data.object
-        const customerId = subscription.customer
+        const subscription = event.data.object as Stripe.Subscription
+        const customerId = subscription.customer as string
         
+        console.log('Subscription cancelled for customer:', customerId)
+
         // Find user by Stripe customer ID
         const { data: user, error: userError } = await supabase
           .from('users')
@@ -165,15 +222,16 @@ Deno.serve(async (req: Request) => {
           })
           .eq('id', user.id)
 
+        console.log(`Downgraded user ${user.email} to Free plan`)
         break
       }
 
-      case 'payment_intent.succeeded': {
-        // Handle one-time credit purchases
-        const paymentIntent = event.data.object
-        const customerId = paymentIntent.customer
+      case 'invoice.payment_succeeded': {
+        const invoice = event.data.object as Stripe.Invoice
+        const customerId = invoice.customer as string
+        const subscriptionId = invoice.subscription as string
         
-        if (!customerId) break
+        console.log('Payment succeeded for subscription:', subscriptionId)
 
         // Find user by Stripe customer ID
         const { data: user, error: userError } = await supabase
@@ -187,23 +245,55 @@ Deno.serve(async (req: Request) => {
           break
         }
 
-        // Add 10 credits for one-time purchase
-        const newCredits = (user.credits || 0) + 10
-
+        // Reset credits to plan limit on successful payment (monthly reset)
+        const planCredits = getCurrentPlanCredits(user.current_plan || 'Free')
+        
         await supabase
           .from('users')
           .update({
-            credits: newCredits,
+            credits: planCredits,
             updated_at: new Date().toISOString()
           })
           .eq('id', user.id)
 
+        console.log(`Reset credits for user ${user.email} to ${planCredits}`)
+        break
+      }
+
+      case 'invoice.payment_failed': {
+        const invoice = event.data.object as Stripe.Invoice
+        const customerId = invoice.customer as string
+        
+        console.log('Payment failed for customer:', customerId)
+
+        // Find user by Stripe customer ID
+        const { data: user, error: userError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('stripe_customer_id', customerId)
+          .single()
+
+        if (userError || !user) {
+          console.error('User not found for customer ID:', customerId)
+          break
+        }
+
+        // Mark subscription as past due but don't immediately downgrade
+        await supabase
+          .from('users')
+          .update({
+            subscription_status: 'past_due',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', user.id)
+
+        console.log(`Marked subscription as past due for user ${user.email}`)
         break
       }
     }
 
     return new Response(
-      JSON.stringify({ success: true }),
+      JSON.stringify({ received: true }),
       {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
