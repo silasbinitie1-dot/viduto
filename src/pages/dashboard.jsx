@@ -189,31 +189,38 @@ export default function Dashboard() {
         }
 
         const chatIdFromUrl = urlParams.get('chat');
+        const fromHomepage = urlParams.get('from') === 'homepage';
 
         if (chatIdFromUrl) {
           const userChats = await Chat.filter({}, '-updated_at');
           setChats(userChats || []);
           setCurrentChatId(chatIdFromUrl);
           window.history.replaceState({}, '', '/dashboard');
-        } else {
+        } else if (fromHomepage || pendingDataStr) {
+          // Handle both cases: direct from homepage or with pending data
            const pendingDataStr = sessionStorage.getItem('pendingChatData');
            if (pendingDataStr) {
+             // Process pending data from homepage
               const pendingData = JSON.parse(pendingDataStr);
               sessionStorage.removeItem('pendingChatData');
               
+             // Create new chat
               const newChat = await Chat.create({ 
                   title: 'Creating video...', 
                   workflow_state: 'draft' 
               });
               
+             // Reconstruct file from base64
               const byteCharacters = atob(pendingData.fileBase64.split(',')[1]);
               const byteNumbers = new Array(byteCharacters.length);
               for (let i = 0; i < byteCharacters.length; i++) { byteNumbers[i] = byteCharacters.charCodeAt(i); }
               const byteArray = new Uint8Array(byteNumbers);
               const file = new File([byteArray], pendingData.fileName, { type: pendingData.fileType });
 
+             // Upload file
               const { file_url } = await UploadFile({ file });
               
+             // Create user message
               await Message.create({
                 chat_id: newChat.id,
                 message_type: 'user',
@@ -221,17 +228,58 @@ export default function Dashboard() {
                 metadata: { image_url: file_url, is_initial_request: true }
               });
 
+             // Generate video brief using AI
+             console.log('Dashboard - Generating brief with OpenAI...', { prompt: pendingData.prompt, image: file_url });
+
+             const { InvokeLLM } = await import('@/api/integrations');
+             const llmResponse = await InvokeLLM({
+               prompt: pendingData.prompt,
+               image_url: file_url,
+               max_tokens: 2000
+             });
+
+             console.log('Dashboard - OpenAI response received:', llmResponse);
+
+             const generatedBrief = llmResponse.response;
+
+             // Create assistant message with the brief
+             await Message.create({
+               chat_id: newChat.id,
+               message_type: 'assistant',
+               content: generatedBrief,
+               metadata: { 
+                 is_brief: true,
+                 brief_generated_at: new Date().toISOString()
+               }
+             });
+
+             // Update chat with brief and state
+             await Chat.update(newChat.id, {
+               workflow_state: 'awaiting_approval',
+               brief: generatedBrief
+             });
+
+             // Update chats list and set current chat
               const userChats = await Chat.filter({}, '-updated_at');
               setChats(userChats || []);
               setCurrentChatId(newChat.id);
               
-           } else {
+           } else if (fromHomepage) {
+             // User came from homepage but no pending data - just show empty state
+             const userChats = await Chat.filter({}, '-updated_at');
+             setChats(userChats || []);
+             // Don't set a current chat, let them start fresh
+           }
+           
+           // Clean up URL
+           window.history.replaceState({}, '', '/dashboard');
+        } else {
+          // Normal dashboard load - show existing chats
               const userChats = await Chat.filter({}, '-updated_at');
               setChats(userChats || []);
               if (userChats && userChats.length > 0) {
                 setCurrentChatId(userChats[0].id);
               }
-           }
         }
       } catch (e) {
         console.error('Initialization failed:', e);
