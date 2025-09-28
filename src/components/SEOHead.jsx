@@ -6,53 +6,54 @@ const SEOHead = () => {
 
   // Define page-specific SEO data
   const getPageSEO = (pathname) => {
+    const baseUrl = import.meta.env.VITE_APP_BASE_URL || 'https://viduto.com'
     const seoData = {
       '/': {
         title: 'Viduto - Create viral videos with your product',
         description: 'Transform your product images into professional 30-second videos with AI. No editing skills needed. Start for free.',
-        ogImage: 'https://viduto.com/og-image-home.jpg',
+        ogImage: `${baseUrl}/og-image-home.jpg`,
         keywords: 'AI video creation, product videos, viral videos, video marketing, TikTok videos'
       },
       '/home': {
         title: 'Viduto - Create viral videos with your product',
         description: 'Transform your product images into professional 30-second videos with AI. No editing skills needed. Start for free.',
-        ogImage: 'https://viduto.com/og-image-home.jpg',
+        ogImage: `${baseUrl}/og-image-home.jpg`,
         keywords: 'AI video creation, product videos, viral videos, video marketing, TikTok videos'
       },
       '/features': {
         title: 'Features - Viduto AI Video Creation Platform',
         description: 'Explore Viduto\'s powerful AI features: text-based video creation, product integration, viral optimization, and more.',
-        ogImage: 'https://viduto.com/og-image-features.jpg',
+        ogImage: `${baseUrl}/og-image-features.jpg`,
         keywords: 'AI video features, text-to-video, product videos, video editing AI'
       },
       '/pricing': {
         title: 'Pricing Plans - Viduto Video Creation',
         description: 'Flexible pricing plans starting at $20/month. Create professional videos with credits-based system. Start with 20 free credits.',
-        ogImage: 'https://viduto.com/og-image-pricing.jpg',
+        ogImage: `${baseUrl}/og-image-pricing.jpg`,
         keywords: 'video creation pricing, AI video cost, subscription plans, video credits'
       },
       '/blog': {
         title: 'Blog - Viduto Video Creation Insights',
         description: 'Latest insights on AI video creation, marketing strategies, and product video best practices.',
-        ogImage: 'https://viduto.com/og-image-blog.jpg',
+        ogImage: `${baseUrl}/og-image-blog.jpg`,
         keywords: 'video marketing blog, AI video insights, product video tips'
       },
       '/enterprise': {
         title: 'Enterprise Solutions - Viduto for Teams',
         description: 'Scale video creation across your organization with enterprise-grade security, team management, and priority support.',
-        ogImage: 'https://viduto.com/og-image-enterprise.jpg',
+        ogImage: `${baseUrl}/og-image-enterprise.jpg`,
         keywords: 'enterprise video creation, team video tools, business video solutions'
       },
       '/terms': {
         title: 'Terms of Service - Viduto',
         description: 'Terms of Service for Viduto video creation platform.',
-        ogImage: 'https://viduto.com/og-image-default.jpg',
+        ogImage: `${baseUrl}/og-image-default.jpg`,
         keywords: 'terms of service, legal, viduto terms'
       },
       '/privacy': {
         title: 'Privacy Policy - Viduto',
         description: 'Privacy Policy for Viduto video creation platform.',
-        ogImage: 'https://viduto.com/og-image-default.jpg',
+        ogImage: `${baseUrl}/og-image-default.jpg`,
         keywords: 'privacy policy, data protection, viduto privacy'
       }
     };
@@ -118,7 +119,7 @@ const SEOHead = () => {
       ogUrl.setAttribute('property', 'og:url');
       document.head.appendChild(ogUrl);
     }
-    ogUrl.setAttribute('content', `https://viduto.com${location.pathname}`);
+    ogUrl.setAttribute('content', `${baseUrl}${location.pathname}`);
 
     // Update Twitter Card
     let twitterCard = document.querySelector('meta[name="twitter:card"]');

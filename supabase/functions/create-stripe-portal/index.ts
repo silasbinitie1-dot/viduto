@@ -145,7 +145,7 @@ Deno.serve(async (req: Request) => {
     console.log('🔗 Creating customer portal session...')
     const portalSession = await stripe.billingPortal.sessions.create({
       customer: customer.id,
-      return_url: `${req.headers.get('origin') || 'https://viduto-tsng.bolt.host'}/dashboard`,
+      return_url: `${req.headers.get('origin') || Deno.env.get('VITE_APP_BASE_URL') || 'http://localhost:5173'}/dashboard`,
     })
     console.log('✅ Portal session created:', portalSession.id)
     
