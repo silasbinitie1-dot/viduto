@@ -143,14 +143,7 @@ export const triggerRevisionWorkflow = async (data) => {
       throw new Error('Not authenticated - please log in again')
     }
 
-    // Get user profile for user details
-    const userProfile = await User.me()
-    
-    if (!userProfile) {
-      throw new Error('User profile not found')
-    }
-
-    const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/start-video-production`
+    const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/trigger-revision-workflow`
     
     const headers = {
       'Authorization': `Bearer ${session.access_token}`,
@@ -189,27 +182,6 @@ export const triggerRevisionWorkflow = async (data) => {
     const { Video } = await import('@/api/entities')
     const parentVideo = await Video.get(parentVideoId)
     
-    // Determine original video ID for the new revision
-    // If parent is a revision, use its original_video_id; otherwise use parent's id
-    const originalVideoUuid = parentVideo.is_revision ? parentVideo.original_video_id : parentVideo.id
-    
-    // For N8N webhook consistency, we need to use the composite video_id strings
-    // instead of the internal UUIDs for parent_video_id and original_video_id
-    let parentVideoCompositeId = parentVideo.video_id
-    let originalVideoCompositeId = parentVideo.video_id
-    
-    // If the parent is a revision, we need to get the original video's composite ID
-    if (parentVideo.is_revision && originalVideoUuid) {
-      try {
-        const originalVideo = await Video.get(originalVideoUuid)
-        originalVideoCompositeId = originalVideo.video_id
-      } catch (error) {
-        console.error('Error fetching original video for composite ID:', error)
-        // Fallback to parent's video_id if we can't fetch the original
-        originalVideoCompositeId = parentVideo.video_id
-      }
-    }
-    
     // Get image URL from the initial user message
     const allMessages = await Message.filter({ chat_id: data.chat_id }, 'created_at')
     const initialMessage = allMessages.find(msg => 
@@ -224,16 +196,12 @@ export const triggerRevisionWorkflow = async (data) => {
       method: 'POST',
       headers,
       body: JSON.stringify({
-        chatId: data.chat_id, 
+        revisionRequest: revisionMessage.content,
+        parentVideoId: parentVideo.video_id,
+        chatId: data.chat_id,
         brief: chat.brief,
         imageUrl: initialMessage.metadata.image_url,
-        isRevision: true,
-        creditsUsed: 2.5,
-        parentVideoId: parentVideoCompositeId,
-        originalVideoId: originalVideoCompositeId,
-        parentVideoUuid: parentVideo.id,
-        originalVideoUuid: originalVideoUuid,
-        revisionRequest: revisionMessage.content
+        creditsUsed: 2.5
       })
     })
 
@@ -349,13 +317,70 @@ export const startVideoProduction = async (data) => {
 }
 
 export const getBlogPosts = async (data = {}) => {
-  // Return empty array to fall back to static posts
-  return { data: { posts: [] } }
+  try {
+    const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/get-blog-posts`
+    
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data)
+    })
+
+    if (!response.ok) {
+      console.warn('Blog posts API failed, falling back to static data')
+      return { data: { posts: [] } }
+    }
+
+    const result = await response.json()
+    return { data: { posts: result.posts || [] } }
+  } catch (error) {
+    console.error('Error fetching blog posts:', error)
+    return { data: { posts: [] } }
+  }
 }
 
 export const ensureUserCredits = async () => {
-  // Mock ensure credits
-  return { success: true, credits_added: 0 }
+  try {
+    // Get the current user's session token
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    
+    if (sessionError || !session?.access_token) {
+      throw new Error('Not authenticated - please log in again')
+    }
+
+    const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ensure-user-credits`
+    
+    const headers = {
+      'Authorization': `Bearer ${session.access_token}`,
+      'Content-Type': 'application/json',
+    }
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({})
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('Ensure Credits API Error Response:', errorText)
+      let errorData
+      try {
+        errorData = JSON.parse(errorText)
+      } catch {
+        errorData = { error: errorText }
+      }
+      throw new Error(errorData.error || 'Failed to ensure user credits')
+    }
+
+    const result = await response.json()
+    return result
+  } catch (error) {
+    console.error('Error ensuring user credits:', error)
+    throw error
+  }
 }
 
 export const setupNewUser = async () => {
@@ -463,8 +488,45 @@ export const robotsTxt = async () => {
 }
 
 export const lockingManager = async (data) => {
-  // Mock locking
-  return { success: true }
+  try {
+    // Get the current user's session token
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    
+    if (sessionError || !session?.access_token) {
+      throw new Error('Not authenticated - please log in again')
+    }
+
+    const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/locking-manager`
+    
+    const headers = {
+      'Authorization': `Bearer ${session.access_token}`,
+      'Content-Type': 'application/json',
+    }
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(data)
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('Locking Manager API Error Response:', errorText)
+      let errorData
+      try {
+        errorData = JSON.parse(errorText)
+      } catch {
+        errorData = { error: errorText }
+      }
+      throw new Error(errorData.error || 'Failed to manage lock')
+    }
+
+    const result = await response.json()
+    return result
+  } catch (error) {
+    console.error('Error with locking manager:', error)
+    throw error
+  }
 }
 
 export const rateLimiter = async (data) => {

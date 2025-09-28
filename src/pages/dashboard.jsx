@@ -153,26 +153,41 @@ export default function Dashboard() {
     const initialize = async () => {
       setLoading(true);
       try {
-        // Check for authentication state change (after OAuth redirect)
-        const { data: { session } } = await supabase.auth.getSession();
+        // Wait for auth state to be ready and check session
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        console.log('Dashboard initialization - Session check:', { 
+          hasSession: !!session, 
+          sessionError: sessionError?.message,
+          userEmail: session?.user?.email 
+        });
+        
         if (!session) {
           console.log('No session found, redirecting to home');
           navigate('/home');
           return;
         }
         
+        // Sync with Stripe first to ensure user data is up to date
         await syncUserWithStripe();
 
         const currentUser = await User.me();
+        console.log('Dashboard initialization - User loaded:', {
+          email: currentUser.email,
+          credits: currentUser.credits,
+          plan: currentUser.current_plan
+        });
+        
         setUser(currentUser);
         setUserCredits(currentUser.credits || 0);
         setAuthError(false);
 
         // This ensures new users or users with 0 credits get their initial credits if applicable
-        if (currentUser.credits == null || currentUser.credits === 0) {
+        if (!currentUser.credits || currentUser.credits === 0) {
           await ensureCredits();
         }
 
+        // Track successful dashboard access
         if (window.fbq) {
           window.fbq('track', 'CompleteRegistration');
         }
@@ -184,35 +199,37 @@ export default function Dashboard() {
           setActiveDashboardView('pricing');
         }
 
-        // 🔄 תיקון: רענן נתוני משתמש אחרי הצלחת תשלום
+        // Handle successful payment redirect
         if (urlParams.get('success') === 'true') {
             toast.success("Payment successful! Your subscription is being updated...");
             if (window.fbq) {
                 window.fbq('track', 'Purchase', { value: 0.01, currency: 'USD' });
             }
             
-            // רענן נתונים מספר פעמים כדי לוודא שהwebhook עודכן
+            // Refresh data multiple times to ensure webhook has updated
             const refreshAfterPayment = async () => {
                 let attempts = 0;
-                const maxAttempts = 10; // Changed from 15 to 10
+                const maxAttempts = 10;
                 
                 const intervalId = setInterval(async () => {
                     attempts++;
                     console.log(`🔄 Post-payment refresh attempt ${attempts}/${maxAttempts}`);
-                    await refreshUserCredits(); // Ensure Stripe sync is part of this refresh
+                    await refreshUserCredits();
                     
                     if (attempts >= maxAttempts) {
                         clearInterval(intervalId);
                         console.log('✅ Completed post-payment refresh attempts');
                     }
-                }, 3000); // Changed from 2000ms to 3000ms
+                }, 3000);
             };
             
             refreshAfterPayment();
             
+            // Clean up URL
             window.history.replaceState({}, document.title, "/dashboard");
         }
 
+        // Handle chat ID from URL or pending data
         const chatIdFromUrl = urlParams.get('chat');
 
         if (chatIdFromUrl) {
@@ -221,36 +238,56 @@ export default function Dashboard() {
           setCurrentChatId(chatIdFromUrl);
           window.history.replaceState({}, '', '/dashboard');
         } else {
+           // Check for pending chat data from home page
            const pendingDataStr = sessionStorage.getItem('pendingChatData');
            if (pendingDataStr) {
+              console.log('Processing pending chat data from sessionStorage');
               const pendingData = JSON.parse(pendingDataStr);
               sessionStorage.removeItem('pendingChatData');
               
-              const newChat = await Chat.create({ 
-                  title: 'Creating video...', 
-                  workflow_state: 'draft' 
-              });
-              
-              const byteCharacters = atob(pendingData.fileBase64.split(',')[1]);
-              const byteNumbers = new Array(byteCharacters.length);
-              for (let i = 0; i < byteCharacters.length; i++) { byteNumbers[i] = byteCharacters.charCodeAt(i); }
-              const byteArray = new Uint8Array(byteNumbers);
-              const file = new File([byteArray], pendingData.fileName, { type: pendingData.fileType });
+              try {
+                const newChat = await Chat.create({ 
+                    title: pendingData.prompt.length > 50 ? pendingData.prompt.substring(0, 50) + '...' : pendingData.prompt, 
+                    workflow_state: 'draft' 
+                });
+                
+                // Reconstruct file from base64
+                const byteCharacters = atob(pendingData.fileBase64.split(',')[1]);
+                const byteNumbers = new Array(byteCharacters.length);
+                for (let i = 0; i < byteCharacters.length; i++) { 
+                  byteNumbers[i] = byteCharacters.charCodeAt(i); 
+                }
+                const byteArray = new Uint8Array(byteNumbers);
+                const file = new File([byteArray], pendingData.fileName, { type: pendingData.fileType });
 
-              const { file_url } = await UploadFile({ file });
-              
-              await Message.create({
-                chat_id: newChat.id,
-                message_type: 'user',
-                content: pendingData.prompt,
-                metadata: { image_url: file_url, is_initial_request: true }
-              });
+                const { file_url } = await UploadFile({ file });
+                
+                await Message.create({
+                  chat_id: newChat.id,
+                  message_type: 'user',
+                  content: pendingData.prompt,
+                  metadata: { image_url: file_url, is_initial_request: true }
+                });
 
-              const userChats = await Chat.filter({ created_by: currentUser.email }, '-updated_date');
-              setChats(userChats || []);
-              setCurrentChatId(newChat.id);
+                const userChats = await Chat.filter({ created_by: currentUser.email }, '-updated_date');
+                setChats(userChats || []);
+                setCurrentChatId(newChat.id);
+                
+                console.log('Successfully processed pending chat data');
+              } catch (error) {
+                console.error('Error processing pending chat data:', error);
+                toast.error('Failed to process your video request. Please try again.');
+                
+                // Load regular chats as fallback
+                const userChats = await Chat.filter({ created_by: currentUser.email }, '-updated_date');
+                setChats(userChats || []);
+                if (userChats && userChats.length > 0) {
+                  setCurrentChatId(userChats[0].id);
+                }
+              }
               
            } else {
+              // Load existing chats
               const userChats = await Chat.filter({ created_by: currentUser.email }, '-updated_date');
               setChats(userChats || []);
               if (userChats && userChats.length > 0) {
@@ -261,27 +298,29 @@ export default function Dashboard() {
       } catch (e) {
         console.error('Initialization failed:', e);
         setAuthError(true);
-        setTimeout(() => navigate('/'), 1000);
+        toast.error('Failed to load dashboard. Redirecting to home...');
+        setTimeout(() => navigate('/home'), 2000);
       } finally {
         setLoading(false);
       }
     };
+    
     initialize();
 
-    // 🔄 תיקון: קיצור זמן רענון לתדירות גבוהה יותר אחרי תשלום
-    const creditsInterval = setInterval(refreshUserCredits, 30000); // כל 30 שניות
+    // Refresh user data periodically
+    const creditsInterval = setInterval(refreshUserCredits, 30000);
 
     return () => {
       clearInterval(creditsInterval);
     };
   }, [navigate, refreshUserCredits, ensureCredits]);
 
-  // רענון נתונים כאשר המשתמש חוזר לדף (visibility change)
+  // Refresh data when user returns to page
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (!document.hidden) {
         console.log('🔄 Page became visible, refreshing user data...');
-        refreshUserCredits(); // Use the full refresh with Stripe sync
+        refreshUserCredits();
       }
     };
 

@@ -182,6 +182,34 @@ export const User = {
       // If profile doesn't exist, try to create it
       console.log('User.me - Profile not found, creating new profile for:', user.email);
       
+      // Call setup-new-user function to ensure proper initialization
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session?.access_token) {
+          const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/setup-new-user`
+          
+          const response = await fetch(apiUrl, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({})
+          })
+          
+          if (response.ok) {
+            const result = await response.json()
+            if (result.success && result.user) {
+              console.log('User.me - Profile created via setup-new-user function');
+              return result.user
+            }
+          }
+        }
+      } catch (setupError) {
+        console.warn('User.me - Setup function failed, falling back to direct creation:', setupError.message);
+      }
+      
+      // Fallback: direct profile creation
       const { data: newProfile, error: createError } = await supabase
         .from('users')
         .insert({

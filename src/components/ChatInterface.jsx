@@ -302,11 +302,16 @@ Ready to bring your vision to life?`,
     setIsGeneratingVideo(true);
 
     try {
-      await lockingManager({
-        action: 'acquire',
-        chatId: chatId,
-        reason: 'Video production in progress'
-      });
+      // Try to acquire lock
+      try {
+        await lockingManager({
+          action: 'acquire',
+          chatId: chatId,
+          reason: 'Video production in progress'
+        });
+      } catch (lockError) {
+        console.warn('Lock acquisition failed, proceeding anyway:', lockError.message);
+      }
 
       const systemMessage = await Message.create({
         chat_id: chatId,
@@ -331,12 +336,10 @@ Ready to bring your vision to life?`,
         throw new Error('Original product image not found');
       }
 
-      const result = await startVideoProduction({
+      const result = await triggerInitialVideoWorkflow({
         chat_id: chatId,
         brief: currentChat.brief,
         image_url: initialMessage.metadata.image_url,
-        is_revision: false,
-        credits_used: 10
       });
 
       if (result.success) {
@@ -359,10 +362,15 @@ Ready to bring your vision to life?`,
       setIsGeneratingVideo(false);
       
       try {
-        await lockingManager({
-          action: 'release',
-          chatId: chatId
-        });
+        // Try to release lock if it was acquired
+        try {
+          await lockingManager({
+            action: 'release',
+            chatId: chatId
+          });
+        } catch (unlockError) {
+          console.warn('Error releasing lock:', unlockError.message);
+        }
       } catch (unlockError) {
         console.error('Error releasing lock:', unlockError);
       }

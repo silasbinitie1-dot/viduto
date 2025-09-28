@@ -167,6 +167,7 @@ export default function Home() {
 
     try {
       if (!user) {
+        console.log('User not logged in, storing pending data and showing auth modal');
         const fileBase64String = await fileToBase64(selectedFile);
 
         const pendingData = {
@@ -178,14 +179,22 @@ export default function Home() {
           fileBase64: fileBase64String,
           timestamp: Date.now()
         };
+        
+        console.log('Storing pending data:', { 
+          promptLength: pendingData.prompt.length,
+          fileName: pendingData.fileName,
+          fileSize: pendingData.fileSize
+        });
+        
         sessionStorage.setItem('pendingChatData', JSON.stringify(pendingData));
         setShowAuthModal(true);
       } else {
+        console.log('User logged in, creating chat directly');
         const { Chat, Message } = await import('@/api/entities');
         const { Core } = await import('@/api/integrations');
 
         const newChat = await Chat.create({
-          title: 'Creating brief...',
+          title: prompt.trim().length > 50 ? prompt.trim().substring(0, 50) + '...' : prompt.trim(),
           workflow_state: 'draft'
         });
 
@@ -199,6 +208,7 @@ export default function Home() {
         });
 
         sessionStorage.removeItem('pendingChatData');
+        console.log('Navigating to dashboard with chat:', newChat.id);
         navigate(`/dashboard?chat=${newChat.id}`);
       }
     } catch (error) {
