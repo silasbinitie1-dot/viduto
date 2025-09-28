@@ -27,7 +27,7 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
     
-    let videoId, explicitVideoUrl, chatId, userId, isRevision
+    let videoId, videoUrl, chatId, userId, isRevision
     
     try {
       const contentType = req.headers.get('content-type') || ''
@@ -39,7 +39,7 @@ Deno.serve(async (req: Request) => {
         console.log('Request body:', JSON.stringify(body, null, 2))
         
         videoId = body.video_id || body.videoId
-        explicitVideoUrl = body.video_url || body.explicitVideoUrl
+        videoUrl = body.video_url || body.videoUrl
         chatId = body.chat_id || body.chatId
         userId = body.user_id || body.userId
         isRevision = body.is_revision === true || body.is_revision === 'true'
@@ -53,7 +53,7 @@ Deno.serve(async (req: Request) => {
         }
         
         videoId = formData.get('video_id') || formData.get('videoId')
-        explicitVideoUrl = formData.get('video_url')
+        videoUrl = formData.get('video_url') || formData.get('videoUrl')
         chatId = formData.get('chat_id') || formData.get('chatId')
         userId = formData.get('user_id') || formData.get('userId')
         isRevision = formData.get('is_revision') === 'true'
@@ -63,7 +63,7 @@ Deno.serve(async (req: Request) => {
         const url = new URL(req.url)
         
         videoId = url.searchParams.get('video_id') || url.searchParams.get('videoId')
-        explicitVideoUrl = url.searchParams.get('video_url') || url.searchParams.get('explicitVideoUrl')
+        videoUrl = url.searchParams.get('video_url') || url.searchParams.get('videoUrl')
         chatId = url.searchParams.get('chat_id') || url.searchParams.get('chatId')
         userId = url.searchParams.get('user_id') || url.searchParams.get('userId')
         isRevision = url.searchParams.get('is_revision') === 'true'
@@ -82,7 +82,7 @@ Deno.serve(async (req: Request) => {
     
     console.log('Extracted parameters:')
     console.log('  videoId:', videoId)
-    console.log('  explicitVideoUrl:', explicitVideoUrl)
+    console.log('  videoUrl:', videoUrl)
     console.log('  chatId:', chatId)
     console.log('  userId:', userId)
     console.log('  isRevision:', isRevision)
@@ -95,7 +95,7 @@ Deno.serve(async (req: Request) => {
       )
     }
     
-    if (!explicitVideoUrl) {
+    if (!videoUrl) {
       console.error('Missing video_url parameter')
       return new Response(
         JSON.stringify({ error: 'Missing video_url' }),
@@ -182,7 +182,7 @@ Deno.serve(async (req: Request) => {
       .from('video')
       .update({
         video_id: videoId, // Ensure the video_id is updated in case we found it by fallback
-        video_url: explicitVideoUrl,
+        video_url: videoUrl,
         status: 'completed',
         processing_completed_at: new Date().toISOString(),
         webhook_received_at: new Date().toISOString()
@@ -234,7 +234,7 @@ Deno.serve(async (req: Request) => {
         content: "",
         metadata: {
           video_completed: true,
-          video_url: explicitVideoUrl,
+          video_url: videoUrl,
           video_id: videoId,
           generation_id: `completion_${videoId}_${Date.now()}`,
           video_only: true,
@@ -303,7 +303,7 @@ Describe any adjustments you'd like, and I'll create a revised version for you. 
         metadata: {
           video_id: videoId,
           chat_id: chatId,
-          video_url: explicitVideoUrl,
+          video_url: videoUrl,
           is_revision: isRevision
         }
       })
