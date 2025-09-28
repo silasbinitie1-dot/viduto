@@ -93,6 +93,13 @@ export const sendFacebookConversionEvent = async (data) => {
 
 export const triggerRevisionWorkflow = async (data) => {
   try {
+    // Check if user has enough credits before starting revision
+    const { User } = await import('@/api/entities');
+    const currentUser = await User.me();
+    if (!currentUser || currentUser.credits < 2.5) {
+      throw new Error('Insufficient credits. You need 2.5 credits to start video revision.');
+    }
+
     // Get the current user's session token
     const { data: { session }, error: sessionError } = await supabase.auth.getSession()
     
@@ -101,7 +108,6 @@ export const triggerRevisionWorkflow = async (data) => {
     }
 
     // Get user profile for user details
-    const { User } = await import('@/api/entities')
     const userProfile = await User.me()
     
     if (!userProfile) {

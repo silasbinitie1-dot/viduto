@@ -131,6 +131,8 @@ Deno.serve(async (req: Request) => {
     const timeoutMs = 15 * 60 * 1000 // 15 minutes
 
     if (video.status === 'processing' && (now - processingStarted) > timeoutMs) {
+      console.log('⏰ Video generation timed out, refunding credits...')
+      
       // Mark as failed due to timeout
       await supabase
         .from('video')
@@ -139,7 +141,7 @@ Deno.serve(async (req: Request) => {
           error_message: 'Video generation timed out',
           processing_completed_at: new Date().toISOString()
         })
-        .eq('video_id', videoId)
+        .eq('id', video.id)
 
       // Update chat state
       await supabase
@@ -158,10 +160,15 @@ Deno.serve(async (req: Request) => {
         .single()
 
       if (userProfile) {
+        const refundAmount = video.credits_used || 10
+        const newCredits = (userProfile.credits || 0) + refundAmount
+        
         await supabase
           .from('users')
-          .update({ credits: userProfile.credits + video.credits_used })
+          .update({ credits: newCredits })
           .eq('id', user.id)
+          
+        console.log('✅ Credits refunded:', { refunded: refundAmount, new_total: newCredits })
       }
 
       // Create timeout message
@@ -170,7 +177,7 @@ Deno.serve(async (req: Request) => {
         .insert({
           chat_id: chatId,
           message_type: 'assistant',
-          content: '❌ Video generation timed out. Your credits have been refunded. Please try again or contact support if this issue persists.',
+          content: `❌ Video generation timed out after 15 minutes. Your ${video.credits_used || 10} credits have been refunded. Please try again or contact support if this issue persists.`,
           metadata: {
             is_error: true,
             error_type: 'timeout',

@@ -528,6 +528,9 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
           isRevision: true
         }));
         
+        // Refresh credits after revision
+        onCreditsRefreshed?.();
+        
         toast.success('Video revision started! This will take about 5 minutes.');
       } else if (currentBrief && !currentChat?.active_video_id && currentChat?.workflow_state === 'awaiting_approval') {
         // This is a brief update request

@@ -149,7 +149,12 @@ Deno.serve(async (req: Request) => {
     if ((userProfile.credits || 0) < creditsUsed) {
       console.log('❌ Insufficient credits:', { available: userProfile.credits, required: creditsUsed })
       return new Response(
-        JSON.stringify({ success: false, error: 'Insufficient credits' }),
+        JSON.stringify({ 
+          success: false, 
+          error: `Insufficient credits. You need ${creditsUsed} credits to ${isRevision ? 'create a revision' : 'start video production'}.`,
+          credits_required: creditsUsed,
+          credits_available: userProfile.credits || 0
+        }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
