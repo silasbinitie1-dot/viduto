@@ -1,13 +1,13 @@
 import { BrowserRouter } from "react-router-dom";
 import './App.css'
-import Pages from "@/pages/index.jsx"
+import IndexRedirect from "@/pages/index.jsx"
 import { Toaster } from "@/components/ui/toaster"
 
 function App() {
   return (
     <BrowserRouter>
      <>
-      <Pages />
+      <IndexRedirect />
       <Toaster />
     </>
     </BrowserRouter>

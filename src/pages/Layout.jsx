@@ -1,8 +1,6 @@
-
 import React, { useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
-import { Toaster } from "@/components/ui/sonner";
-import { toast } from "sonner"; // toast is no longer used in the new useEffect, but keeping import as it might be used elsewhere.
+import { Toaster } from "sonner";
 import Home from './home';
 import Features from './features';
 import Pricing from './pricing';
@@ -12,7 +10,6 @@ import Enterprise from './enterprise';
 import Terms from './terms';
 import Privacy from './privacy';
 import Dashboard from './dashboard';
-import IndexRedirect from './index';
 
 export default function Layout() {
   useEffect(() => {
@@ -37,7 +34,6 @@ export default function Layout() {
     }
   }, []);
 
-
   return (
     <>
       <style>{`
@@ -58,7 +54,6 @@ export default function Layout() {
       `}</style>
       
       <Routes>
-        <Route path="/" element={<IndexRedirect />} />
         <Route path="/home" element={<Home />} />
         <Route path="/features" element={<Features />} />
         <Route path="/pricing" element={<Pricing />} />

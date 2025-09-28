@@ -1,6 +1,6 @@
 import React from 'react';
-import { Navigate } from 'react-router-dom';
+import Layout from './Layout';
 
 export default function Pages() {
-  return <Navigate to="/home" replace />;
+  return <Layout />;
 }
