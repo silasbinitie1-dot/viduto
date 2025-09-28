@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Menu, Clock, Building, Check, X, Camera, Wand2, Edit, Upload, Play } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { User } from '@/entities/User';
+import { User } from '@/api/entities';
 import { Button } from '@/components/ui/button';
 import { AuthModal } from '../components/AuthModal';
 import { MobileMenu } from '../components/MobileMenu';
