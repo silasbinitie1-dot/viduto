@@ -37,6 +37,7 @@ export default function ChatInterface({
   const [pollingInterval, setPollingInterval] = useState(null);
   const [revisionPollingInterval, setRevisionPollingInterval] = useState(null);
   const [user, setUser] = useState(null);
+  const [isBriefGenerationTriggered, setIsBriefGenerationTriggered] = useState(false);
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
 
@@ -64,6 +65,7 @@ export default function ChatInterface({
     if (!chatIdToLoad) {
       setMessages([]);
       setCurrentChat(null);
+      setIsBriefGenerationTriggered(false);
       return;
     }
 
@@ -93,16 +95,32 @@ export default function ChatInterface({
             startVideoPolling(activeVideo.video_id);
           }
         }
+      } else if (chat.workflow_state === 'draft' && !isBriefGenerationTriggered) {
+        // Check if this is a new chat with initial user message and image
+        const initialMessage = (chatMessages || []).find(msg => 
+          msg.message_type === 'user' && 
+          msg.metadata?.is_initial_request === true &&
+          msg.metadata?.image_url
+        );
+        
+        if (initialMessage && !chat.brief) {
+          console.log('🔍 Found draft chat with initial message, generating brief...');
+          setIsBriefGenerationTriggered(true);
+          await generateBrief(initialMessage.content, initialMessage.metadata.image_url);
+        }
       }
     } catch (error) {
       console.error('Error loading messages:', error);
       setMessages([]);
       setCurrentChat(null);
+      setIsBriefGenerationTriggered(false);
     }
   }, []);
 
   useEffect(() => {
     loadMessages(chatId);
+    // Reset brief generation trigger when chatId changes
+    setIsBriefGenerationTriggered(false);
   }, [chatId, loadMessages]);
 
   const startVideoPolling = useCallback((videoId) => {
