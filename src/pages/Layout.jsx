@@ -1,15 +1,5 @@
 import React, { useEffect } from 'react';
-import { Routes, Route } from 'react-router-dom';
-import { Toaster } from "sonner";
-import Home from './home';
-import Features from './features';
-import Pricing from './pricing';
-import Blog from './blog';
-import BlogPost from './BlogPost';
-import Enterprise from './enterprise';
-import Terms from './terms';
-import Privacy from './privacy';
-import Dashboard from './dashboard';
+import { Outlet } from 'react-router-dom';
 
 export default function Layout() {
   useEffect(() => {
@@ -34,37 +24,5 @@ export default function Layout() {
     }
   }, []);
 
-  return (
-    <>
-      <style>{`
-        @keyframes fadeIn {
-          from { opacity: 0; }
-          to { opacity: 1; }
-        }
-        @keyframes scaleIn {
-          from { transform: scale(0.95); opacity: 0; }
-          to { transform: scale(1); opacity: 1; }
-        }
-        .animate-fadeIn {
-          animation: fadeIn 0.3s ease-out forwards;
-        }
-        .animate-scaleIn {
-          animation: scaleIn 0.3s ease-out forwards;
-        }
-      `}</style>
-      
-      <Routes>
-        <Route path="/home" element={<Home />} />
-        <Route path="/features" element={<Features />} />
-        <Route path="/pricing" element={<Pricing />} />
-        <Route path="/blog" element={<Blog />} />
-        <Route path="/BlogPost" element={<BlogPost />} />
-        <Route path="/enterprise" element={<Enterprise />} />
-        <Route path="/terms" element={<Terms />} />
-        <Route path="/privacy" element={<Privacy />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-      </Routes>
-      <Toaster position="top-center" richColors />
-    </>
-  );
+  return <Outlet />;
 }
