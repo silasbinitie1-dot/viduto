@@ -114,17 +114,17 @@ Deno.serve(async (req: Request) => {
     const endpointSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");
     
     if (!stripeKey) {
-        console.error('Missing Stripe configuration: STRIPE_SECRET_KEY');
+        console.error('❌ STRIPE_SECRET_KEY not found');
         return new Response(
-          JSON.stringify({ error: 'Configuration Error' }),
+          JSON.stringify({ error: 'Stripe API key not found. Please set STRIPE_SECRET_KEY environment variable.' }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
     }
     
     if (!endpointSecret) {
-        console.error('Missing Stripe configuration: STRIPE_WEBHOOK_SECRET');
+        console.error('❌ STRIPE_WEBHOOK_SECRET not found');
         return new Response(
-          JSON.stringify({ error: 'Configuration Error' }),
+          JSON.stringify({ error: 'Stripe webhook secret not found. Please set STRIPE_WEBHOOK_SECRET environment variable.' }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
     }
