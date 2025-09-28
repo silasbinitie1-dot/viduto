@@ -5,7 +5,7 @@ export default function Layout() {
   useEffect(() => {
     // Load Facebook Pixel dynamically to ensure it loads properly
     if (!window.fbq) {
-      !function(f,b,e,v,n,t,s)
+      ;!function(f,b,e,v,n,t,s)
       {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
       n.callMethod.apply(n,arguments):n.queue.push(arguments)};
       if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
