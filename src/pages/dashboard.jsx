@@ -1,19 +1,23 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Menu, X, User as UserIcon, CreditCard, LogOut, Plus, MessageSquare, HelpCircle, Sun, Moon, Gift, Zap, Settings } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { User, Chat, Message } from '@/api/entities';
-import { UploadFile } from '@/api/integrations';
+import { User } from '@/entities/User';
+import { Chat } from '@/entities/Chat';
+import { Message } from '@/entities/Message';
+import { UploadFile } from '@/integrations/Core';
 import { ChatInterface } from '../components/ChatInterface';
 import { Button } from '@/components/ui/button';
 import { HelpModal } from '../components/HelpModal';
 import { SubscriptionPage } from '../components/SubscriptionPage';
 import { WinCreditsModal } from '../components/WinCreditsModal';
 import { CreditsModal } from '../components/CreditsModal';
+import { trackSignupConversion } from '@/functions/trackSignupConversion';
 import { toast } from "sonner";
 import Logo from "@/components/Logo";
-import { ensureUserCredits } from '@/api/functions';
-import { createStripeCustomerPortal } from '@/api/functions';
-import { syncUserWithStripe } from '@/api/functions';
+import { ensureUserCredits } from '@/functions/ensureUserCredits';
+import { createStripeCustomerPortal } from '@/functions/createStripeCustomerPortal';
+import { syncUserWithStripe } from '@/functions/syncUserWithStripe';
 
 export default function Dashboard() {
   const [user, setUser] = useState(null);
@@ -154,22 +158,24 @@ export default function Dashboard() {
     const initialize = async () => {
       setLoading(true);
       try {
-        console.log('Dashboard - Initializing...');
-        
-        // Try to get user profile directly - this will handle auth check internally
+        await syncUserWithStripe();
+
         const currentUser = await User.me();
-        
         setUser(currentUser);
         setUserCredits(currentUser.credits || 0);
         setAuthError(false);
-        
-        console.log('Dashboard - Authentication successful:', currentUser);
+
+        // This ensures new users or users with 0 credits get their initial credits if applicable
+        if (currentUser.credits == null || currentUser.credits === 0) {
+          await ensureCredits();
+        }
 
         if (window.fbq) {
           window.fbq('track', 'CompleteRegistration');
         }
         
         const urlParams = new URLSearchParams(window.location.search);
+        
         const view = urlParams.get('view');
         if (view === 'pricing') {
           setActiveDashboardView('pricing');
@@ -182,45 +188,54 @@ export default function Dashboard() {
                 window.fbq('track', 'Purchase', { value: 0.01, currency: 'USD' });
             }
             
-            // Skip post-payment refresh for now
-            // refreshAfterPayment();
+            // רענן נתונים מספר פעמים כדי לוודא שהwebhook עודכן
+            const refreshAfterPayment = async () => {
+                let attempts = 0;
+                const maxAttempts = 10; // Changed from 15 to 10
+                
+                const intervalId = setInterval(async () => {
+                    attempts++;
+                    console.log(`🔄 Post-payment refresh attempt ${attempts}/${maxAttempts}`);
+                    await refreshUserCredits(); // Ensure Stripe sync is part of this refresh
+                    
+                    if (attempts >= maxAttempts) {
+                        clearInterval(intervalId);
+                        console.log('✅ Completed post-payment refresh attempts');
+                    }
+                }, 3000); // Changed from 2000ms to 3000ms
+            };
+            
+            refreshAfterPayment();
             
             window.history.replaceState({}, document.title, "/dashboard");
         }
 
         const chatIdFromUrl = urlParams.get('chat');
-        const fromHomepage = urlParams.get('from') === 'homepage';
-       const pendingDataStr = sessionStorage.getItem('pendingChatData');
 
         if (chatIdFromUrl) {
-          const userChats = await Chat.filter({}, '-updated_at');
+          const userChats = await Chat.filter({ created_by: currentUser.email }, '-updated_date');
           setChats(userChats || []);
           setCurrentChatId(chatIdFromUrl);
           window.history.replaceState({}, '', '/dashboard');
-        } else if (fromHomepage || pendingDataStr) {
-          // Handle both cases: direct from homepage or with pending data
+        } else {
+           const pendingDataStr = sessionStorage.getItem('pendingChatData');
            if (pendingDataStr) {
-             // Process pending data from homepage
               const pendingData = JSON.parse(pendingDataStr);
               sessionStorage.removeItem('pendingChatData');
               
-             // Create new chat
               const newChat = await Chat.create({ 
                   title: 'Creating video...', 
                   workflow_state: 'draft' 
               });
               
-             // Reconstruct file from base64
               const byteCharacters = atob(pendingData.fileBase64.split(',')[1]);
               const byteNumbers = new Array(byteCharacters.length);
               for (let i = 0; i < byteCharacters.length; i++) { byteNumbers[i] = byteCharacters.charCodeAt(i); }
               const byteArray = new Uint8Array(byteNumbers);
               const file = new File([byteArray], pendingData.fileName, { type: pendingData.fileType });
 
-             // Upload file
               const { file_url } = await UploadFile({ file });
               
-             // Create user message
               await Message.create({
                 chat_id: newChat.id,
                 message_type: 'user',
@@ -228,92 +243,50 @@ export default function Dashboard() {
                 metadata: { image_url: file_url, is_initial_request: true }
               });
 
-             // Generate video brief using AI
-             console.log('Dashboard - Generating brief with OpenAI...', { prompt: pendingData.prompt, image: file_url });
-
-             const { InvokeLLM } = await import('@/api/integrations');
-             const llmResponse = await InvokeLLM({
-               prompt: pendingData.prompt,
-               image_url: file_url,
-               max_tokens: 2000
-             });
-
-             console.log('Dashboard - OpenAI response received:', llmResponse);
-
-             const generatedBrief = llmResponse.response;
-
-             // Create assistant message with the brief
-             await Message.create({
-               chat_id: newChat.id,
-               message_type: 'assistant',
-               content: generatedBrief,
-               metadata: { 
-                 is_brief: true,
-                 brief_generated_at: new Date().toISOString()
-               }
-             });
-
-             // Update chat with brief and state
-             await Chat.update(newChat.id, {
-               workflow_state: 'awaiting_approval',
-               brief: generatedBrief
-             });
-
-             // Update chats list and set current chat
-              const userChats = await Chat.filter({}, '-updated_at');
+              const userChats = await Chat.filter({ created_by: currentUser.email }, '-updated_date');
               setChats(userChats || []);
               setCurrentChatId(newChat.id);
               
-           } else if (fromHomepage) {
-             // User came from homepage but no pending data - just show empty state
-             const userChats = await Chat.filter({}, '-updated_at');
-             setChats(userChats || []);
-             // Don't set a current chat, let them start fresh
-           }
-           
-           // Clean up URL
-           window.history.replaceState({}, '', '/dashboard');
-        } else {
-          // Normal dashboard load - show existing chats
-              const userChats = await Chat.filter({}, '-updated_at');
+           } else {
+              const userChats = await Chat.filter({ created_by: currentUser.email }, '-updated_date');
               setChats(userChats || []);
               if (userChats && userChats.length > 0) {
                 setCurrentChatId(userChats[0].id);
               }
+           }
         }
       } catch (e) {
         console.error('Initialization failed:', e);
-        // If it's an auth error, redirect to home
-        if (e.message?.includes('Not authenticated') || e.message?.includes('Invalid token')) {
-          console.log('Dashboard - Authentication failed, redirecting...');
-          setAuthError(true);
-          setTimeout(() => navigate('/'), 1000);
-        } else {
-          // For other errors, show them but don't redirect
-          console.error('Dashboard - Non-auth error:', e);
-          setAuthError(false);
-        }
+        setAuthError(true);
+        setTimeout(() => navigate('/'), 1000);
       } finally {
         setLoading(false);
       }
     };
     initialize();
+
+    // 🔄 תיקון: קיצור זמן רענון לתדירות גבוהה יותר אחרי תשלום
+    const creditsInterval = setInterval(refreshUserCredits, 30000); // כל 30 שניות
+
+    return () => {
+      clearInterval(creditsInterval);
+    };
   }, [navigate, refreshUserCredits, ensureCredits]);
 
-  // Skip visibility change refresh for now
-  // useEffect(() => {
-  //   const handleVisibilityChange = () => {
-  //     if (!document.hidden) {
-  //       console.log('🔄 Page became visible, refreshing user data...');
-  //       refreshUserCredits();
-  //     }
-  //   };
+  // רענון נתונים כאשר המשתמש חוזר לדף (visibility change)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden) {
+        console.log('🔄 Page became visible, refreshing user data...');
+        refreshUserCredits(); // Use the full refresh with Stripe sync
+      }
+    };
 
-  //   document.addEventListener('visibilitychange', handleVisibilityChange);
-  //   return () => {
-  //     document.removeEventListener('visibilitychange', handleVisibilityChange);
-  //   };
-  // }, [refreshUserCredits]);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [refreshUserCredits]);
 
 
   const createNewChat = async () => {
@@ -339,7 +312,7 @@ export default function Dashboard() {
   const handleChatUpdate = useCallback(async (newChatId = null) => {
     try {
         const currentUser = await User.me();
-        const userChats = await Chat.filter({}, '-updated_at');
+        const userChats = await Chat.filter({ created_by: currentUser.email }, '-updated_date');
         setChats(userChats || []);
         if (newChatId && currentChatId === null) {
           setCurrentChatId(newChatId);
@@ -347,7 +320,7 @@ export default function Dashboard() {
           setCurrentChatId(userChats[0].id);
         }
     } catch(e) {
-        console.error("Failed to update chats", e);
+        console.error("Failed to update chats", e)
     }
   }, [currentChatId]);
 
@@ -551,7 +524,7 @@ export default function Dashboard() {
                 >
                   <p className="text-sm md:text-base font-normal truncate">{chat.title || 'New Video Project'}</p>
                   <p className={`text-xs md:text-sm mt-1 font-light ${darkMode ? 'text-gray-500' : 'text-gray-600'}`}>
-                    {new Date(chat.updated_at).toLocaleDateString()}
+                    {new Date(chat.updated_date).toLocaleDateString()}
                   </p>
                 </button>
               ))
