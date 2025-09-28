@@ -1,204 +1,70 @@
 
-import React, { useState, useEffect } from 'react';
-import { X, Loader2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { checkVideoStatus } from '@/api/functions';
-import { toast } from "sonner";
+import React from "react";
+import { Loader2, Timer } from "lucide-react";
 
-export default function ProductionProgress({ 
-    videoId, 
-    startedAt, 
-    chatId, 
-    darkMode = false, 
-    onCancel, 
-    isCancelling = false,
-    isRevision = false,
-    onVideoCompleted
-}) {
-    const [progress, setProgress] = useState(0);
-    const [timeElapsed, setTimeElapsed] = useState(0);
-    const [estimatedDuration] = useState(isRevision ? 5 * 60 * 1000 : 12 * 60 * 1000); // 5 or 12 minutes in ms
-    const [videoStatus, setVideoStatus] = useState('processing');
-    const [statusMessage, setStatusMessage] = useState('Starting video production...');
-    const [pollingActive, setPollingActive] = useState(true);
-    
-    // Polling for video status using the actual edge function
-    useEffect(() => {
-        if (!pollingActive) return;
-        
-        const pollStatus = async () => {
-            try {
-                console.log('Polling video status for:', { videoId, chatId });
-                
-                const { checkVideoStatus } = await import('@/api/functions');
-                const statusResult = await checkVideoStatus({
-                    videoId: videoId,
-                    chatId: chatId
-                });
-                
-                console.log('Status result:', statusResult);
-                
-                if (statusResult.status === 'completed' && statusResult.video_url) {
-                    setStatusMessage('Video completed successfully!');
-                    setVideoStatus('completed');
-                    setProgress(100);
-                    setPollingActive(false);
-                    toast.success('Video completed successfully!');
-                    onVideoCompleted?.(statusResult.video_url);
-                } else if (statusResult.status === 'failed') {
-                    setStatusMessage('Video generation failed');
-                    setVideoStatus('failed');
-                    setPollingActive(false);
-                    toast.error('Video generation failed');
-                } else {
-                    setStatusMessage('Creating your video...');
-                    // Update progress from server
-                    if (statusResult.progress !== undefined) {
-                        setProgress(statusResult.progress);
-                    }
-                    // Ensure we stay in processing state
-                    setVideoStatus('processing');
-                }
-            } catch (error) {
-                console.error('Error polling video status:', error);
-                setStatusMessage('Checking video status...');
-                // Don't mark as failed immediately - could be temporary network issue
-                // Only stop polling after multiple consecutive failures
-            }
-        };
-        
-        // Poll immediately, then every 10 seconds
-        pollStatus();
-        const pollInterval = setInterval(pollStatus, 15000); // Poll every 15 seconds
-        
-        return () => clearInterval(pollInterval);
-    }, [pollingActive, onVideoCompleted, videoId, chatId]);
+export default function ProductionProgress({ videoId, startedAt, darkMode = false }) {
+  // Estimate: 6 minutes for initial productions
+  const ESTIMATE_SECONDS = 6 * 60;
 
-    useEffect(() => {
-        if (!pollingActive) return;
+  const [now, setNow] = React.useState(Date.now());
+  const safeStartedAt = typeof startedAt === "number" && startedAt > 0 ? startedAt : Date.now();
 
-        const timeInterval = setInterval(() => {
-            const now = Date.now();
-            const elapsed = Math.floor((now - startedAt) / 1000); // seconds
-            setTimeElapsed(elapsed);
-            
-            // Only update progress from time if we're not getting it from server
-            if (videoStatus === 'processing') {
-                const progressPercent = Math.min((elapsed * 1000 / estimatedDuration) * 95, 95);
-                setProgress(Math.max(progress, progressPercent));
-            }
-        }, 1000);
+  React.useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
 
-        return () => clearInterval(timeInterval);
-    }, [startedAt, pollingActive, estimatedDuration, progress, videoStatus]);
+  const elapsed = Math.max(0, Math.floor((now - safeStartedAt) / 1000));
+  const remaining = Math.max(0, ESTIMATE_SECONDS - elapsed);
 
-    const formatTime = (seconds) => {
-        const minutes = Math.floor(seconds / 60);
-        const remainingSeconds = seconds % 60;
-        return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
-    };
+  // Linear simulated progress up to 99%
+  const rawProgress = Math.floor((elapsed / ESTIMATE_SECONDS) * 99);
+  const progress = Math.min(99, Math.max(0, rawProgress));
 
-    const getStatusMessage = () => {
-        if (videoStatus === 'processing') {
-            const estimateSeconds = estimatedDuration / 1000; // Convert to seconds
-            
-            if (timeElapsed < estimateSeconds) {
-                const remaining = estimateSeconds - timeElapsed;
-                const remainingMinutes = Math.ceil(remaining / 60);
-                return `Creating your ${isRevision ? 'revised ' : ''}video... About ${remainingMinutes} minutes remaining`;
-            } else {
-                return `Finalizing your ${isRevision ? 'revised ' : ''}video... Almost ready!`;
-            }
-        } else if (videoStatus === 'completed') {
-            return 'Video completed successfully!';
-        } else if (videoStatus === 'failed') {
-            return 'Video generation failed';
-        }
-        
-        return 'Processing...';
-    };
+  const formatTime = (s) => {
+    const mm = String(Math.floor(s / 60)).padStart(2, "0");
+    const ss = String(s % 60).padStart(2, "0");
+    return `${mm}:${ss}`;
+  };
 
-    return (
-        <div className={`rounded-xl p-6 shadow-lg border ${
-            darkMode 
-                ? 'bg-gray-800 border-gray-700' 
-                : 'bg-white border-gray-200'
-        }`}>
-            <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-3">
-                    <Loader2 className="w-6 h-6 animate-spin text-orange-500" />
-                    <div>
-                        <h3 className={`text-lg font-normal ${
-                            darkMode ? 'text-white' : 'text-gray-900'
-                        }`}>
-                            {isRevision ? 'Creating Revision' : 'Creating Video'}
-                        </h3>
-                    </div>
-                </div>
+  // Clean labels without percent ranges
+  const getPhase = (p) => {
+    if (p <= 9) return "Analyzing Video Plan";
+    if (p <= 69) return "Generating Scenes";
+    if (p <= 79) return "Generating Music";
+    if (p <= 89) return "Creating VoiceOver";
+    return "Rendering Video";
+  };
 
-                <Button
-                    onClick={() => onCancel?.(chatId, videoId)}
-                    disabled={isCancelling}
-                    variant="outline"
-                    size="icon"
-                    className={`w-8 h-8 rounded-full ${
-                        darkMode 
-                            ? 'border-gray-600 text-gray-400 hover:text-gray-200 hover:bg-gray-700' 
-                            : 'border-gray-300 text-gray-600 hover:text-gray-800 hover:bg-gray-50'
-                    }`}
-                    title="Cancel production"
-                >
-                    {isCancelling ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                        <X className="w-4 h-4" />
-                    )}
-                </Button>
-            </div>
+  return (
+    <div className={`w-full rounded-xl p-8 md:p-10 border ${darkMode ? "bg-gray-800/60 border-gray-700 text-white" : "bg-white border-gray-200 text-gray-900"}`}>
+      {/* Header centered with big percent */}
+      <div className="text-center mb-4 md:mb-6">
+        <p className="text-xl md:text-2xl font-light">Your video is generating...</p>
+        <span className="block mt-2 text-5xl md:text-6xl font-bold text-orange-500 tabular-nums">
+          {progress}%
+        </span>
+      </div>
 
-            {/* Progress Bar */}
-            <div className="mb-4">
-                <div className={`w-full rounded-full h-3 ${
-                    darkMode ? 'bg-gray-700' : 'bg-gray-200'
-                }`}>
-                    <div
-                        className="bg-gradient-to-r from-orange-500 to-orange-600 h-3 rounded-full transition-all duration-1000 ease-out"
-                        style={{ width: `${progress}%` }}
-                    ></div>
-                </div>
-                
-                <div className="flex justify-between items-center mt-2">
-                    <span className={`text-sm font-medium ${
-                        darkMode ? 'text-orange-400' : 'text-orange-600'
-                    }`}>
-                        {Math.round(progress)}%
-                    </span>
-                    <span className={`text-sm ${
-                        darkMode ? 'text-gray-400' : 'text-gray-600'
-                    }`}>
-                        {formatTime(timeElapsed)}
-                    </span>
-                </div>
-            </div>
+      {/* Current phase centered */}
+      <div className="flex items-center justify-center gap-3 mb-6">
+        <Loader2 className={`w-6 h-6 animate-spin ${darkMode ? "text-orange-400" : "text-orange-500"}`} />
+        <span className="text-lg md:text-xl font-medium">{getPhase(progress)}</span>
+      </div>
 
-            {/* Status Message */}
-            <div className={`text-sm font-light ${
-                darkMode ? 'text-gray-300' : 'text-gray-700'
-            }`}>
-                {statusMessage}
-            </div>
+      {/* Progress bar */}
+      <div className={`w-full ${darkMode ? "bg-gray-700" : "bg-gray-200"} rounded-full h-3 md:h-4`}>
+        <div
+          className="bg-orange-500 h-full rounded-full transition-all duration-500"
+          style={{ width: `${progress}%` }}
+        />
+      </div>
 
-            {progress >= 99 && (
-                <div className={`mt-3 p-3 rounded-lg ${
-                    darkMode ? 'bg-orange-900/20 border border-orange-700' : 'bg-orange-50 border border-orange-200'
-                }`}>
-                    <p className={`text-sm ${
-                        darkMode ? 'text-orange-300' : 'text-orange-700'
-                    }`}>
-                        🎬 Your video is almost ready! It will appear automatically when processing completes.
-                    </p>
-                </div>
-            )}
-        </div>
-    );
+      {/* Timer under the bar centered */}
+      <div className="mt-4 md:mt-5 flex items-center justify-center gap-2">
+        <Timer className={`w-5 h-5 ${darkMode ? "text-gray-300" : "text-gray-600"}`} />
+        <span className="text-lg md:text-xl tabular-nums">{formatTime(remaining)}</span>
+      </div>
+    </div>
+  );
 }
