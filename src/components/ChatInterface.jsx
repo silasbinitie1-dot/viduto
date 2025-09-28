@@ -749,38 +749,6 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
                 )}
 
                 {/* System Approval Instruction Message */}
-                {message.message_type === 'system' && message.metadata?.is_approval_instruction && (
-                  <div className="flex justify-center">
-                    <div className={`max-w-[80%] rounded-2xl p-6 text-center ${
-                      darkMode ? 'bg-green-900/20 border border-green-700' : 'bg-green-50 border border-green-200'
-                    }`}>
-                      <div className={`font-medium leading-relaxed mb-4 ${
-                        darkMode ? 'text-green-300' : 'text-green-700'
-                      }`}>
-                        <strong>Please carefully read the Video Plan before you generate the video, check if it fits your vision and request changes if it doesn't until it feels perfect!</strong>
-                        <br /><br />
-                        ✅ Ready to Create?
-                      </div>
-                      
-                      {currentChat?.workflow_state === 'awaiting_approval' && (
-                        <div className="mt-6">
-                          <Button
-                            onClick={handleApproveBrief}
-                           disabled={loading}
-                            className="bg-orange-500 text-white hover:bg-orange-600 gap-2 px-8 py-3 text-base font-medium"
-                          >
-                            {loading ? (
-                              <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                              <Play className="w-4 h-4" />
-                            )}
-                           Approve and start production
-                          </Button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
 
                 {/* Regular AI Response with Video */}
                 {message.message_type === 'assistant' && !message.metadata?.is_brief && message.metadata?.video_url && (
@@ -894,8 +862,40 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
         )}
       </div>
 
+      {/* Approval UI - Always visible when awaiting approval */}
+      {currentChat?.workflow_state === 'awaiting_approval' && (
+        <div className="flex justify-center p-4">
+          <div className={`max-w-[80%] rounded-2xl p-6 text-center ${
+            darkMode ? 'bg-green-900/20 border border-green-700' : 'bg-green-50 border border-green-200'
+          }`}>
+            <div className={`font-medium leading-relaxed mb-4 ${
+              darkMode ? 'text-green-300' : 'text-green-700'
+            }`}>
+              <strong>Please carefully read the Video Plan before you generate the video, check if it fits your vision and request changes if it doesn't until it feels perfect!</strong>
+              <br /><br />
+              ✅ Ready to Create?
+            </div>
+
+            <div className="mt-6">
+              <Button
+                onClick={handleApproveBrief}
+                disabled={loading}
+                className="bg-orange-500 text-white hover:bg-orange-600 gap-2 px-8 py-3 text-base font-medium"
+              >
+                {loading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Play className="w-4 h-4" />
+                )}
+                Approve and start production
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Input Form - Only show if not in production and not awaiting approval */}
-      {currentChat?.workflow_state !== 'in_production' && currentChat?.workflow_state !== 'awaiting_approval' && (
+      {currentChat?.workflow_state !== 'in_production' && (
         <div className={`border-t p-4 ${darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'}`}>
           <form onSubmit={handleSubmit} className="space-y-3">
             {selectedFile && !currentBrief && (
