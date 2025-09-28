@@ -13,7 +13,7 @@ import { FaqsSection } from '../components/FaqsSection';
 import { CtaSection } from '../components/CtaSection';
 import { Footer } from '../components/Footer';
 import { sendFacebookConversionEvent } from '@/api/functions';
-import { Toaster, toast } from 'react-hot-toast';
+import { useToast } from '@/components/ui/use-toast';
 
 // Helper function to convert file to base64
 const fileToBase64 = (file) => {
@@ -28,6 +28,7 @@ const fileToBase64 = (file) => {
 export default function Home() {
   const [user, setUser] = useState(null);
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [prompt, setPrompt] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -143,7 +144,11 @@ export default function Home() {
     e.preventDefault();
 
     if (!selectedFile || !prompt.trim()) {
-      toast.error('Please upload an image and describe your video.');
+      toast({
+        title: "Missing Information",
+        description: "Please upload an image and describe your video.",
+        variant: "destructive"
+      });
       return;
     }
 
@@ -237,7 +242,11 @@ export default function Home() {
       }
     } catch (error) {
       console.error('Error submitting:', error);
-      toast.error('Failed to create video request. Please try again.');
+      toast({
+        title: "Error",
+        description: "Failed to create video request. Please try again.",
+        variant: "destructive"
+      });
       sessionStorage.removeItem('pendingChatData');
     } finally {
       setIsSubmitting(false);
@@ -278,7 +287,6 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-white" style={{ '--header-bg': 'rgba(255, 255, 255, 0.7)', '--text-dark': '#333', '--text-medium': '#666', '--text-light': '#999', '--accent-orange': '#F97316', '--accent-primary': '#60A5FA', '--accent-secondary': '#818CF8', '--surface-elevated': '#F3F4F6', '--input-border': '#E5E7EB', '--accent-success': '#10B981' }}>
-      <Toaster position="top-center" reverseOrder={false} />
       
       {/* Header */}
       <header className={`fixed top-0 inset-x-0 z-50 transition-all duration-300`}>
