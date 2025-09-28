@@ -110,11 +110,19 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
     
-    const stripeKey = Deno.env.get("STRIPE_SECRET_KEY") || Deno.env.get("stripe") || Deno.env.get("STRIPE");
+    const stripeKey = Deno.env.get('STRIPE_SECRET_KEY');
     const endpointSecret = Deno.env.get("STRIPE_WEBHOOK_SECRET");
     
-    if (!stripeKey || !endpointSecret) {
-        console.error('Missing Stripe configuration: STRIPE_SECRET_KEY or STRIPE_WEBHOOK_SECRET');
+    if (!stripeKey) {
+        console.error('Missing Stripe configuration: STRIPE_SECRET_KEY');
+        return new Response(
+          JSON.stringify({ error: 'Configuration Error' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+    }
+    
+    if (!endpointSecret) {
+        console.error('Missing Stripe configuration: STRIPE_WEBHOOK_SECRET');
         return new Response(
           JSON.stringify({ error: 'Configuration Error' }),
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

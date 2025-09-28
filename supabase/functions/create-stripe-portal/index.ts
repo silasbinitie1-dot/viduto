@@ -21,7 +21,7 @@ Deno.serve(async (req: Request) => {
     console.log('📥 Request method:', req.method)
 
     // Initialize Stripe
-    const stripeKey = Deno.env.get('STRIPE_SECRET_KEY') || Deno.env.get('stripe') || Deno.env.get('STRIPE')
+    const stripeKey = Deno.env.get('STRIPE_SECRET_KEY')
     if (!stripeKey) {
       console.error('❌ Stripe API key not found')
       return new Response(
