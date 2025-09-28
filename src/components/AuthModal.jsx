@@ -24,8 +24,8 @@ export const AuthModal = ({ isOpen, onClose }) => {
             // Check if there's pending chat data to determine redirect URL
             const pendingChatData = sessionStorage.getItem('pendingChatData');
             const redirectTo = pendingChatData 
-                ? `${window.location.origin}/dashboard?from=homepage`
-                : `${window.location.origin}/dashboard`;
+                ? `${window.location.origin}/home`
+                : `${window.location.origin}/home`;
             
             // Use Supabase Google OAuth
             const { error } = await supabase.auth.signInWithOAuth({
