@@ -488,6 +488,11 @@ export const robotsTxt = async () => {
 }
 
 export const lockingManager = async (data) => {
+  // Mock locking
+  return { success: true }
+}
+
+export const rateLimiter = async (data) => {
   try {
     // Get the current user's session token
     const { data: { session }, error: sessionError } = await supabase.auth.getSession()
@@ -496,7 +501,7 @@ export const lockingManager = async (data) => {
       throw new Error('Not authenticated - please log in again')
     }
 
-    const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/locking-manager`
+    const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/rate-limiter`
     
     const headers = {
       'Authorization': `Bearer ${session.access_token}`,
@@ -511,25 +516,20 @@ export const lockingManager = async (data) => {
 
     if (!response.ok) {
       const errorText = await response.text()
-      console.error('Locking Manager API Error Response:', errorText)
+      console.error('Rate Limiter API Error Response:', errorText)
       let errorData
       try {
         errorData = JSON.parse(errorText)
       } catch {
         errorData = { error: errorText }
       }
-      throw new Error(errorData.error || 'Failed to manage lock')
+      throw new Error(errorData.error || 'Failed to check rate limit')
     }
 
     const result = await response.json()
     return result
   } catch (error) {
-    console.error('Error with locking manager:', error)
+    console.error('Error with rate limiter:', error)
     throw error
   }
-}
-
-export const rateLimiter = async (data) => {
-  // Mock rate limiter
-  return { success: true, allowed: true }
 }
