@@ -264,7 +264,7 @@ export default function Dashboard() {
 
         if (chatIdFromUrl) {
           console.log('✅ Processing chat ID from URL:', chatIdFromUrl);
-          const userChats = await Chat.filter({ created_by: currentUser.email }, '-updated_date');
+          const userChats = await Chat.filter({ user_id: currentUser.id }, '-updated_at');
           setChats(userChats || []);
           setCurrentChatId(chatIdFromUrl);
           window.history.replaceState({}, '', '/dashboard');
@@ -304,7 +304,7 @@ export default function Dashboard() {
                 });
                 console.log('✅ Created initial message from pending data');
 
-                const userChats = await Chat.filter({ created_by: currentUser.email }, '-updated_date');
+                const userChats = await Chat.filter({ user_id: currentUser.id }, '-updated_at');
                 setChats(userChats || []);
                 setCurrentChatId(newChat.id);
                 
@@ -315,7 +315,7 @@ export default function Dashboard() {
                 toast.error('Failed to process your video request. Please try again.');
                 
                 // Load regular chats as fallback
-                const userChats = await Chat.filter({ created_by: currentUser.email }, '-updated_date');
+                const userChats = await Chat.filter({ user_id: currentUser.id }, '-updated_at');
                 setChats(userChats || []);
                 if (userChats && userChats.length > 0) {
                   setCurrentChatId(userChats[0].id);
@@ -325,7 +325,7 @@ export default function Dashboard() {
            } else {
               console.log('🔍 No pending data, loading existing chats...');
               // Load existing chats
-              const userChats = await Chat.filter({ created_by: currentUser.email }, '-updated_date');
+              const userChats = await Chat.filter({ user_id: currentUser.id }, '-updated_at');
               setChats(userChats || []);
               if (userChats && userChats.length > 0) {
                 setCurrentChatId(userChats[0].id);
@@ -399,7 +399,7 @@ export default function Dashboard() {
   const handleChatUpdate = useCallback(async (newChatId = null) => {
     try {
         const currentUser = await User.me();
-        const userChats = await Chat.filter({ created_by: currentUser.email }, '-updated_date');
+        const userChats = await Chat.filter({ user_id: currentUser.id }, '-updated_at');
         setChats(userChats || []);
         if (newChatId && currentChatId === null) {
           setCurrentChatId(newChatId);
