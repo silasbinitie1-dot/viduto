@@ -187,41 +187,6 @@ export function PricingContent({ isSubscriptionView = false, darkMode = false, u
     }
   };
 
-  const handleBuyCreditPack = async (amount) => {
-    if (!user) {
-        setShowAuthModal(true);
-        return;
-    }
-
-    const quantity = amount / oneTimeCreditUnitAmount;
-
-    setLoading(prev => ({ ...prev, 'Credit Pack': true }));
-    
-    try {
-        const response = await createStripeCheckoutSession({ 
-          priceId: oneTimeCreditPriceId, 
-          mode: 'payment',
-          quantity: quantity 
-        });
-        
-        if (response.data?.url) {
-            window.location.href = response.data.url;
-        } else {
-            throw new Error('No checkout URL returned');
-        }
-
-    } catch (error) {
-        console.error('Error creating checkout session:', error);
-        toast({
-          title: "Purchase Failed",
-          description: 'Failed to start checkout process. Please try again.',
-          variant: "destructive",
-        });
-    } finally {
-        setLoading(prev => ({ ...prev, 'Credit Pack': false }));
-    }
-  };
-
   const handleManageSubscription = async () => {
     setLoading(prev => ({ ...prev, 'manage': true }));
     try {
