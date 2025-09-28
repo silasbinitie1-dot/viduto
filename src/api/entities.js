@@ -195,6 +195,7 @@ export const User = {
   },
 
   logout: async () => {
+  }
   update: async (data) => {
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     
