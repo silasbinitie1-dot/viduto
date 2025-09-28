@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { supabase } from '@/lib/supabase';
+import { User } from '@/entities/User';
 import { X } from 'lucide-react';
 import { toast } from "sonner";
 import Logo from "@/components/Logo";
@@ -19,25 +19,8 @@ export const AuthModal = ({ isOpen, onClose }) => {
                 window.fbq('track', 'InitiateCheckout');
             }
             
-            console.log('AuthModal - Starting Google OAuth login...');
-            
-            // Check if there's pending chat data to determine redirect URL
-            const pendingChatData = sessionStorage.getItem('pendingChatData');
-            const redirectTo = pendingChatData 
-                ? `${window.location.origin}/home`
-                : `${window.location.origin}/home`;
-            
-            // Use Supabase Google OAuth
-            const { error } = await supabase.auth.signInWithOAuth({
-                provider: 'google',
-                options: {
-                    redirectTo: redirectTo
-                }
-            });
-            
-            if (error) {
-                throw error;
-            }
+            // Use the Base44 Google OAuth login method
+            await User.login();
         } catch (error) {
             console.error('Google login failed:', error);
             toast.error('Login failed. Please try again.');
