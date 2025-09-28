@@ -27,7 +27,7 @@ Deno.serve(async (req: Request) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
     
-    let videoId, explicitVideoUrl, chatId, userId
+    let videoId, explicitVideoUrl, chatId, userId, isRevision
     
     try {
       const contentType = req.headers.get('content-type') || ''
@@ -42,6 +42,7 @@ Deno.serve(async (req: Request) => {
         explicitVideoUrl = body.video_url || body.explicitVideoUrl
         chatId = body.chat_id || body.chatId
         userId = body.user_id || body.userId
+        isRevision = body.is_revision === true || body.is_revision === 'true'
         
       } else if (contentType.includes('multipart/form-data')) {
         console.log('Parsing form data...')
@@ -55,6 +56,7 @@ Deno.serve(async (req: Request) => {
         explicitVideoUrl = formData.get('video_url')
         chatId = formData.get('chat_id') || formData.get('chatId')
         userId = formData.get('user_id') || formData.get('userId')
+        isRevision = formData.get('is_revision') === 'true'
         
       } else {
         console.log('Parsing URL search params...')
@@ -64,6 +66,7 @@ Deno.serve(async (req: Request) => {
         explicitVideoUrl = url.searchParams.get('video_url') || url.searchParams.get('explicitVideoUrl')
         chatId = url.searchParams.get('chat_id') || url.searchParams.get('chatId')
         userId = url.searchParams.get('user_id') || url.searchParams.get('userId')
+        isRevision = url.searchParams.get('is_revision') === 'true'
       }
       
     } catch (parseError) {
@@ -82,6 +85,7 @@ Deno.serve(async (req: Request) => {
     console.log('  explicitVideoUrl:', explicitVideoUrl)
     console.log('  chatId:', chatId)
     console.log('  userId:', userId)
+    console.log('  isRevision:', isRevision)
     
     if (!videoId) {
       console.error('Missing video_id/videoId parameter')
@@ -136,20 +140,41 @@ Deno.serve(async (req: Request) => {
       if (processingVideos && processingVideos.length > 0) {
         video = processingVideos[0]
         console.log(`Found processing video in chat: ${video.id}`)
+      } else {
+        // Create video record if it doesn't exist
+        console.log(`Video record not found for ${videoId}, creating one...`)
+        
+        const { data: newVideo, error: createError } = await supabase
+          .from('video')
+          .insert({
+            chat_id: chatId,
+            video_id: videoId,
+            prompt: isRevision ? 'Revision video' : 'Generated video',
+            status: 'processing',
+            processing_started_at: new Date().toISOString(),
+            credits_used: isRevision ? 2.5 : 10,
+            credits_charged: isRevision ? 2.5 : 10,
+            brief_data: { is_revision: isRevision }
+          })
+          .select()
+          .single()
+        
+        if (createError) {
+          console.error('Failed to create video record:', createError.message)
+          return new Response(
+            JSON.stringify({ 
+              error: 'Failed to create video record',
+              details: createError.message 
+            }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+        
+        video = newVideo
+        console.log('Created Video record:', video.id)
       }
     }
     
-    if (!video) {
-      console.error(`No video found with video_id: ${videoId} or processing video in chat: ${chatId}`)
-      return new Response(
-        JSON.stringify({ 
-          error: 'Video not found',
-          video_id: videoId,
-          chat_id: chatId
-        }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
     
     // Update the video record
     console.log(`Updating video ${video.id} with completed status and URL`)
@@ -194,6 +219,12 @@ Deno.serve(async (req: Request) => {
     
     // Create completion messages using service role
     console.log(`Creating completion messages for chat ${chatId}`)
+    
+    // Create appropriate completion message based on revision status
+    const messageContent = isRevision ? 
+      '🎉 **Your revised video is ready!**\n\nHere\'s your updated video with the changes you requested.' :
+      '🎉 **Your video is ready!**\n\nYour professional 30-second video has been created successfully!';
+    
     // 1) Video message first (so the video appears before any text in chat)
     const { error: videoMessageError } = await supabase
       .from('message')
@@ -206,7 +237,9 @@ Deno.serve(async (req: Request) => {
           video_url: explicitVideoUrl,
           video_id: videoId,
           generation_id: `completion_${videoId}_${Date.now()}`,
-          video_only: true
+          video_only: true,
+          is_revision: isRevision,
+          product_name: video.product_name || 'product'
         }
       })
     
@@ -215,19 +248,16 @@ Deno.serve(async (req: Request) => {
     }
     
     // 2) Text message after the video
-    const completionMessage = `🎉 **Your video is ready!**
-
-Your professional 30-second video has been created successfully. You can download it, share it on social media, or request revisions (costs 2.5 credits).`
-    
     const { error: textMessageError } = await supabase
       .from('message')
       .insert({
         chat_id: chatId,
         message_type: 'assistant',
-        content: completionMessage,
+        content: messageContent,
         metadata: {
           notice_type: 'video_ready',
-          video_id: videoId
+          video_id: videoId,
+          is_revision: isRevision
         }
       })
     
@@ -235,25 +265,27 @@ Your professional 30-second video has been created successfully. You can downloa
       console.error('Failed to create text message:', textMessageError.message)
     }
     
-    // 3) Optional revision guidance message
-    const revisionGuidance = `**Want to make changes?**
+    // 3) Optional revision guidance message (only for initial videos, not revisions)
+    if (!isRevision) {
+      const revisionGuidance = `**Want to make changes?**
 
 Describe any adjustments you'd like, and I'll create a revised version for you. It takes about 10 minutes to generate. Each revision costs 2.5 credits.`
-    
-    const { error: revisionMessageError } = await supabase
-      .from('message')
-      .insert({
-        chat_id: chatId,
-        message_type: 'assistant',
-        content: revisionGuidance,
-        metadata: {
-          revision_option: true,
-          parent_video_id: videoId
-        }
-      })
-    
-    if (revisionMessageError) {
-      console.error('Failed to create revision message:', revisionMessageError.message)
+      
+      const { error: revisionMessageError } = await supabase
+        .from('message')
+        .insert({
+          chat_id: chatId,
+          message_type: 'assistant',
+          content: revisionGuidance,
+          metadata: {
+            revision_option: true,
+            parent_video_id: videoId
+          }
+        })
+      
+      if (revisionMessageError) {
+        console.error('Failed to create revision message:', revisionMessageError.message)
+      }
     }
     
     console.log('Successfully created completion messages')
@@ -262,16 +294,17 @@ Describe any adjustments you'd like, and I'll create a revised version for you. 
     const { error: logError } = await supabase
       .from('system_log')
       .insert({
-        operation: 'video_production_completed',
+        operation: isRevision ? 'video_revision_completed' : 'video_production_completed',
         entity_type: 'video',
         entity_id: video.id,
         user_email: userId || 'system',
         status: 'success',
-        message: 'Video production completed successfully',
+        message: isRevision ? 'Video revision completed successfully' : 'Video production completed successfully',
         metadata: {
           video_id: videoId,
           chat_id: chatId,
-          video_url: explicitVideoUrl
+          video_url: explicitVideoUrl,
+          is_revision: isRevision
         }
       })
     
@@ -285,7 +318,9 @@ Describe any adjustments you'd like, and I'll create a revised version for you. 
         message: 'Callback processed successfully',
         video_id: videoId,
         chat_id: chatId,
-        status: 'completed'
+        status: 'completed',
+        is_revision: isRevision,
+        record_created: !videos || videos.length === 0
       }),
       {
         status: 200,
