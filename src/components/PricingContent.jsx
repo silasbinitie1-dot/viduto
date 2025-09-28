@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Check, Plus, Minus } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { User } from '@/entities/User';
+import { User } from '@/api/entities';
 import { useNavigate } from 'react-router-dom';
 import { AuthModal } from '@/components/AuthModal';
 import { sendFacebookConversionEvent } from '@/functions/sendFacebookConversionEvent';

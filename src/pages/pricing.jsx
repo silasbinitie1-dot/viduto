@@ -5,7 +5,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { PricingContent } from '../components/PricingContent';
 import { Footer } from '../components/Footer';
 import { Button } from '@/components/ui/button';
-import { User } from '@/entities/User';
+import { User } from '@/api/entities';
 import { AuthModal } from '../components/AuthModal';
 import { MobileMenu } from '../components/MobileMenu'; // Added import for MobileMenu
 import { sendFacebookConversionEvent } from '@/api/functions';
