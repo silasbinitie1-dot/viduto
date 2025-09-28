@@ -1,14 +1,15 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Check, Plus, Minus } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { User } from '@/api/entities';
+import { User } from '@/entities/User';
 import { useNavigate } from 'react-router-dom';
 import { AuthModal } from '@/components/AuthModal';
-import { sendFacebookConversionEvent } from '@/api/functions';
+import { sendFacebookConversionEvent } from '@/functions/sendFacebookConversionEvent';
 import { useToast } from '@/components/ui/use-toast';
-import { createStripeCheckoutSession } from '@/api/functions';
-import { createStripeCustomerPortal } from '@/api/functions';
+import { createStripeCheckoutSession } from '@/functions/createStripeCheckoutSession';
+import { createStripeCustomerPortal } from '@/functions/createStripeCustomerPortal';
 
 
 const pricingPlans = [
@@ -99,6 +100,10 @@ export function PricingContent({ isSubscriptionView = false, darkMode = false, u
         return;
     }
     
+    // Removed Facebook Conversion Event logic and related plan lookup as per outline.
+    // The previous logic for direct upgrade (response.upgraded) has been removed,
+    // assuming all upgrades will now involve a redirect to Stripe Checkout.
+
     setLoading(prev => ({ ...prev, [priceId]: true }));
     
     try {
@@ -107,28 +112,18 @@ export function PricingContent({ isSubscriptionView = false, darkMode = false, u
             mode: 'subscription'
         });
 
-        if (response.data?.upgraded) {
-            // Direct upgrade with prorated credits
-            toast({
-              title: "Plan Upgraded!",
-              description: response.data.message,
-              variant: "default",
-            });
-            
-            // Refresh user data
-            setTimeout(() => {
-              window.location.reload();
-            }, 1500);
-        } else if (response.data?.url) {
+        if (response.url) {
             // Redirect to Stripe Checkout
-            window.location.href = response.data.url;
+            window.location.href = response.url;
         } else {
+            // Updated error message to match outline's simplified expectation
             throw new Error('No checkout URL received from server');
         }
 
     } catch (error) {
         console.error('Upgrade error:', error);
         
+        // Ensure error messages are always in English and use existing toast mechanism
         const errorMessage = error.message || 'Failed to create checkout session. Please try again.';
         
         toast({
@@ -158,6 +153,16 @@ export function PricingContent({ isSubscriptionView = false, darkMode = false, u
         currency: 'USD'
       });
     }
+
+    sendFacebookConversionEvent({
+      eventName: 'InitiateCheckout',
+      value: calculatedValue,
+      currency: 'USD',
+      customData: {
+        content_name: 'Credit Pack',
+        content_category: 'credits'
+      }
+    }).catch(e => console.error('Failed to send InitiateCheckout event:', e));
 
     setLoading(prev => ({ ...prev, 'Credit Pack': true }));
     
