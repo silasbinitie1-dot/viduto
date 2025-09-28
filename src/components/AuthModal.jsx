@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { User } from '@/entities/User';
+import { User } from '@/api/entities';
 import { X } from 'lucide-react';
 import { toast } from "sonner";
 import Logo from "@/components/Logo";

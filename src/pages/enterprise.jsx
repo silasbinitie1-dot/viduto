@@ -5,7 +5,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Footer } from '../components/Footer';
 import { CtaSection } from '../components/CtaSection';
 import { Button } from '@/components/ui/button';
-import { User } from '@/entities/User';
+import { User } from '@/api/entities';
 import { AuthModal } from '../components/AuthModal';
 import { MobileMenu } from '../components/MobileMenu';
 

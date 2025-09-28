@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { X, Zap } from 'lucide-react';
-import { createStripeCheckoutSession } from '@/functions/createStripeCheckoutSession';
+import { createStripeCheckoutSession } from '@/api/functions';
 import { toast } from "sonner";
 
 export const CreditsModal = ({ isOpen, onClose, onPurchaseComplete, darkMode = false }) => {

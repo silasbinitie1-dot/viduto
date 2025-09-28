@@ -10,7 +10,7 @@ import { MobileMenu } from "../components/MobileMenu";
 import Logo from "@/components/Logo";
 import PostCard from "../components/blog/PostCard";
 import { postsData } from "../components/blog/postsData";
-import { getBlogPosts } from "@/functions/getBlogPosts";
+import { getBlogPosts } from "@/api/functions";
 
 export default function BlogPage() {
   const [user, setUser] = useState(null);

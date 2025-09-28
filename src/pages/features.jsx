@@ -4,7 +4,7 @@ import { Camera, Clock, MessageSquare, Wand2, TrendingUp, DollarSign, FileText, 
 import { Link, useNavigate } from 'react-router-dom';
 import { Footer } from '../components/Footer';
 import { Button } from '@/components/ui/button';
-import { User } from '@/entities/User';
+import { User } from '@/api/entities';
 import { AuthModal } from '../components/AuthModal';
 import { MobileMenu } from '../components/MobileMenu'; // Import MobileMenu
 import Logo from "@/components/Logo";

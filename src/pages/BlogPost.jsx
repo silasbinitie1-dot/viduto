@@ -8,7 +8,7 @@ import { AuthModal } from "../components/AuthModal";
 import { MobileMenu } from "../components/MobileMenu";
 import Logo from "@/components/Logo";
 import ReactMarkdown from "react-markdown";
-import { getBlogPosts } from "@/functions/getBlogPosts";
+import { getBlogPosts } from "@/api/functions";
 import { Loader2 } from "lucide-react";
 
 export default function BlogPost() {

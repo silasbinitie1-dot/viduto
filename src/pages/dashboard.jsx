@@ -15,9 +15,7 @@ import { CreditsModal } from '../components/CreditsModal';
 import { trackSignupConversion } from '@/functions/trackSignupConversion';
 import { toast } from "sonner";
 import Logo from "@/components/Logo";
-import { ensureUserCredits } from '@/functions/ensureUserCredits';
-import { createStripeCustomerPortal } from '@/functions/createStripeCustomerPortal';
-import { syncUserWithStripe } from '@/functions/syncUserWithStripe';
+import { ensureUserCredits, createStripeCustomerPortal, syncUserWithStripe } from '@/api/functions';
 
 export default function Dashboard() {
   const [user, setUser] = useState(null);

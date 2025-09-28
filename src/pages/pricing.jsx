@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { User } from '@/entities/User';
 import { AuthModal } from '../components/AuthModal';
 import { MobileMenu } from '../components/MobileMenu'; // Added import for MobileMenu
-import { sendFacebookConversionEvent } from '@/functions/sendFacebookConversionEvent';
+import { sendFacebookConversionEvent } from '@/api/functions';
 
 export default function PricingPage() {
   const [user, setUser] = useState(null);

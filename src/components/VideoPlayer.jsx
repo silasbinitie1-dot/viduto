@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Video as VideoEntity } from '@/entities/Video';
+import { Video as VideoEntity } from '@/api/entities';
 import { Button } from '@/components/ui/button';
 import { Download, ExternalLink } from 'lucide-react';
 
