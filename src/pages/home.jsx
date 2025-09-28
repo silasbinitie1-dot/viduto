@@ -182,15 +182,14 @@ export default function Home() {
         setShowAuthModal(true);
       } else {
         const { Chat, Message } = await import('@/api/entities');
-        const { UploadFile } = await import('@/api/integrations');
+        const { Core } = await import('@/api/integrations');
 
         const newChat = await Chat.create({
           title: 'Creating brief...',
-          status: 'draft',
           workflow_state: 'draft'
         });
 
-        const { file_url } = await UploadFile({ file: selectedFile });
+        const { file_url } = await Core.UploadFile({ file: selectedFile });
 
         await Message.create({
           chat_id: newChat.id,

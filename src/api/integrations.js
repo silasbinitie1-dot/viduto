@@ -1,148 +1,49 @@
 import { supabase } from '@/lib/supabase'
-import OpenAI from 'openai'
-
-// Initialize OpenAI client
-const openai = new OpenAI({
-  apiKey: import.meta.env.VITE_OPENAI_API_KEY,
-  dangerouslyAllowBrowser: true
-})
 
 export const Core = {
   InvokeLLM: async ({ prompt, image_url, max_tokens = 2000 }) => {
     try {
-      const systemPrompt = `# VIDEO PLAN GENERATOR - FINAL VERSION
+      // Get the current user's session token
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      
+      if (sessionError || !session?.access_token) {
+        throw new Error('Not authenticated - please log in again')
+      }
 
-## CRITICAL INSTRUCTION
-The voiceover for EACH SCENE must contain EXACTLY 15 words. Not 14, not 16.
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/invoke-llm`
+      
+      const headers = {
+        'Authorization': `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+      }
 
-## PRODUCT COMPATIBILITY CHECK
-Based on the product image and user request, evaluate product suitability for AI video generation.
-If the product falls into any of the 'UNSUITABLE PRODUCTS' categories, set the 'COMPATIBILITY CHECK' field in the OUTPUT FORMAT to '⚠️ May have limitations' or '❌ Not recommended' as appropriate, but still generate the full video plan. Do NOT stop generating the plan.
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          prompt,
+          image_url,
+          max_tokens
+        })
+      })
 
-UNSUITABLE PRODUCTS:
-- Very small items (pills, jewelry under 1cm, tiny accessories)
-- Transparent/clear products without distinctive features
-
-## ROLE & OBJECTIVE
-You are an elite video creative director specializing in viral TikTok content. Transform user's simple prompt and product image into a production-ready 30-second video plan optimized for MiniMax Hailuo 02 generation.
-
-## INTERNAL ANALYSIS (DO NOT INCLUDE IN OUTPUT)
-Analyze these elements internally before creating the plan:
-PRODUCT PERSONALITY, USER INTENT, AUDIENCE TARGETING, VIBE SELECTION.
-
-## MINIMAX HAILUO 02 STRENGTHS TO LEVERAGE
-Glass/metal reflections, water/steam, particle systems, lighting transitions, texture reveals, atmospherics.
-
-## STRATEGIC SCENE ALLOCATION
-SCENE 1: TikTok hook. SCENES 2-5: safe reliable scenes.
-
-## VIBE-SPECIFIC ADAPTATIONS
-LUXURY, MINIMAL, TRENDY, COZY, ENERGETIC, DRAMATIC, PLAYFUL, ELEGANT, BOLD (use appropriate staging).
-
-## PRODUCT-SPECIFIC SCENE SELECTION
-Jewelry/watches, fashion, beauty, tech, food/beverage, health/supplements.
-
-## SCENE 1 HOOKS BY PRODUCT TYPE
-Use appropriate hook per category.
-
-## AUDIENCE-APPROPRIATE TARGETING
-Match vibe to audience & goal.
-
-## FALLBACK MECHANISMS
-If unclear → default to TECH. Conflicts → TRENDY. Contradictions → adapt to TRENDY.
-
-## WORD COUNT ENFORCEMENT
-Each voiceover MUST be exactly 15 words using:
-"[Emotional opener 3-4 words] + [Benefit 6-8 words] + [Call to feeling 4-5 words]"
-
-## VALIDATION CHECKLIST
-✓ Hook ✓ MiniMax strengths ✓ Product always visible ✓ 15 words per scene ✓ Vibe alignment ✓ Avoid problematic elements.
-
-## OUTPUT FORMAT
-
-PRODUCT TYPE: [Single word]
-
-
-COMPATIBILITY CHECK: [✅ Suitable / ⚠️ May have limitations / ❌ Not recommended]
-
-
-VIDEO VIBE: [LUXURY/MINIMAL/TRENDY/COZY/ENERGETIC/DRAMATIC/PLAYFUL/ELEGANT/BOLD]
-
-
-TARGET AUDIENCE: [Extracted from user input]
-
-
-EMOTIONAL GOAL: [feel gorgeous/confident/powerful/etc.]
-
-
-MUSIC STYLE: [Specific genre matching vibe and audience]
-
-
-SCENE 1:
-Visual: [...]
-Voiceover: [Exactly 15 words]
-
-
-SCENE 2:
-Visual: [...]
-Voiceover: [Exactly 15 words]
-
-
-SCENE 3:
-Visual: [...]
-Voiceover: [Exactly 15 words]
-
-
-SCENE 4:
-Visual: [...]
-Voiceover: [Exactly 15 words]
-
-
-SCENE 5:
-Visual: [...]
-Voiceover: [Exactly 15 words]`;
-
-      const messages = [
-        {
-          role: "system",
-          content: systemPrompt
-        },
-        {
-          role: "user",
-          content: [
-            {
-              type: "text",
-              text: `Please create a detailed video plan for this product based on my request: "${prompt}"`
-            },
-            ...(image_url ? [{
-              type: "image_url",
-              image_url: {
-                url: image_url,
-                detail: "high"
-              }
-            }] : [])
-          ]
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('LLM API Error Response:', errorText)
+        let errorData
+        try {
+          errorData = JSON.parse(errorText)
+        } catch {
+          errorData = { error: errorText }
         }
-      ];
+        throw new Error(errorData.error || 'Failed to invoke LLM')
+      }
 
-      const completion = await openai.chat.completions.create({
-        model: "gpt-4o",
-        messages: messages,
-        max_tokens: max_tokens,
-        temperature: 0.7
-      });
-
-      return {
-        response: completion.choices[0].message.content,
-        usage: {
-          prompt_tokens: completion.usage.prompt_tokens,
-          completion_tokens: completion.usage.completion_tokens,
-          total_tokens: completion.usage.total_tokens
-        }
-      };
+      const result = await response.json()
+      return result
     } catch (error) {
-      console.error('OpenAI API Error:', error);
-      throw new Error(`Failed to generate brief: ${error.message}`);
+      console.error('Error invoking LLM:', error)
+      throw error
     }
   },
   
@@ -154,48 +55,50 @@ Voiceover: [Exactly 15 words]`;
   
   UploadFile: async ({ file }) => {
     try {
+      // Get the current user's session token
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      
+      if (sessionError || !session?.access_token) {
+        throw new Error('Not authenticated - please log in again')
+      }
+
       if (!file || !(file instanceof File)) {
         throw new Error('Invalid file provided')
       }
 
-      // Generate unique filename
-      const fileExt = file.name.split('.').pop()
-      const timestamp = Date.now()
-      const randomString = Math.random().toString(36).substring(2)
-      const fileName = `${timestamp}_${randomString}.${fileExt}`
-      const filePath = `uploads/${fileName}`
-
-      console.log('Uploading file:', { name: file.name, size: file.size, type: file.type })
-      console.log('Generated file path:', filePath)
-
-      // Upload to Supabase Storage
-      const { data, error } = await supabase.storage
-        .from('user-uploads')
-        .upload(filePath, file)
-
-      if (error) {
-        console.error('Supabase storage error:', error)
-        throw new Error(`File upload failed: ${error.message}`)
-      }
-
-      console.log('File uploaded successfully:', data)
-
-      // Get public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('user-uploads')
-        .getPublicUrl(filePath)
-
-      console.log('Generated public URL:', publicUrl)
+      const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/upload-file`
       
-      // Validate that we're not returning a base64 URL
-      if (publicUrl.startsWith('data:')) {
-        throw new Error('Upload failed - received base64 URL instead of storage URL')
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('bucket', 'user-uploads')
+
+      const headers = {
+        'Authorization': `Bearer ${session.access_token}`,
       }
 
-      return { file_url: publicUrl }
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers,
+        body: formData
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error('Upload API Error Response:', errorText)
+        let errorData
+        try {
+          errorData = JSON.parse(errorText)
+        } catch {
+          errorData = { error: errorText }
+        }
+        throw new Error(errorData.error || 'Failed to upload file')
+      }
+
+      const result = await response.json()
+      return result
     } catch (error) {
-      console.error('Upload error:', error)
-      throw new Error(`Failed to upload file: ${error.message}`)
+      console.error('Error uploading file:', error)
+      throw error
     }
   },
   

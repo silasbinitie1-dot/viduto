@@ -179,9 +179,29 @@ export const User = {
       .single()
 
     if (profileError) {
-      // If profile doesn't exist, this is an error - trigger should have created it
-      console.error('User.me - Profile not found for authenticated user:', user.email);
-      throw new Error('User profile not found. Please contact support.');
+      // If profile doesn't exist, try to create it
+      console.log('User.me - Profile not found, creating new profile for:', user.email);
+      
+      const { data: newProfile, error: createError } = await supabase
+        .from('users')
+        .insert({
+          id: user.id,
+          email: user.email,
+          full_name: user.user_metadata?.full_name || user.email.split('@')[0],
+          credits: 20,
+          subscription_status: 'inactive',
+          current_plan: 'Free'
+        })
+        .select()
+        .single()
+      
+      if (createError) {
+        console.error('User.me - Failed to create profile:', createError.message);
+        throw new Error('Failed to create user profile. Please contact support.');
+      }
+      
+      console.log('User.me - Profile created successfully for:', user.email)
+      return newProfile
     }
 
     console.log('User.me - Profile found:', profile.email, 'Credits:', profile.credits)
@@ -195,6 +215,10 @@ export const User = {
   },
 
   logout: async () => {
+    const { error } = await supabase.auth.signOut()
+    if (error) {
+      throw new Error(`Logout failed: ${error.message}`)
+    }
   },
   update: async (data) => {
     const { data: { user }, error: authError } = await supabase.auth.getUser()

@@ -86,9 +86,45 @@ export const createStripeCustomerPortal = async () => {
 }
 
 export const sendFacebookConversionEvent = async (data) => {
-  // Mock Facebook event
-  console.log('Mock Facebook conversion event:', data)
-  return { success: true }
+  try {
+    // Get the current user's session token
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    
+    if (sessionError || !session?.access_token) {
+      throw new Error('Not authenticated - please log in again')
+    }
+
+    const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-facebook-event`
+    
+    const headers = {
+      'Authorization': `Bearer ${session.access_token}`,
+      'Content-Type': 'application/json',
+    }
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(data)
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('Facebook Event API Error Response:', errorText)
+      let errorData
+      try {
+        errorData = JSON.parse(errorText)
+      } catch {
+        errorData = { error: errorText }
+      }
+      throw new Error(errorData.error || 'Failed to send Facebook event')
+    }
+
+    const result = await response.json()
+    return result
+  } catch (error) {
+    console.error('Error sending Facebook event:', error)
+    throw error
+  }
 }
 
 export const triggerRevisionWorkflow = async (data) => {

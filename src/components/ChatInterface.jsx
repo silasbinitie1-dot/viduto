@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Send, Upload, X, Loader2, Play, Download, AlertCircle } from "lucide-react";
 import { Chat, Message, User, Video } from "@/api/entities";
-import { UploadFile, InvokeLLM } from "@/api/integrations";
+import { Core } from "@/api/integrations";
 import { 
   rateLimiter, 
   startVideoProduction, 
@@ -214,7 +214,7 @@ export default function ChatInterface({
 
     setIsUploading(true);
     try {
-      const result = await UploadFile({ file: selectedFile });
+      const result = await Core.UploadFile({ file: selectedFile });
       setSelectedFile(null);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
@@ -232,11 +232,15 @@ export default function ChatInterface({
   const generateBrief = async (userMessage, imageUrl) => {
     setIsGeneratingBrief(true);
     try {
-      const briefResponse = await InvokeLLM({
+      const briefResponse = await Core.InvokeLLM({
         prompt: userMessage,
         image_url: imageUrl,
         max_tokens: 2000
       });
+
+      if (!briefResponse.success) {
+        throw new Error(briefResponse.error || 'Failed to generate brief');
+      }
 
       const briefMessage = await Message.create({
         chat_id: chatId,
