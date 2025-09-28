@@ -2,9 +2,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Menu, Clock, Building, Check, X, Camera, Wand2, Edit, Upload, Play } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { User } from '@/api/entities';
+import { User } from '@/entities/User';
 import { Button } from '@/components/ui/button';
-import Logo from '../components/Logo';
 import { AuthModal } from '../components/AuthModal';
 import { MobileMenu } from '../components/MobileMenu';
 import { ProductShowcaseSection } from '../components/ProductShowcaseSection';
@@ -12,8 +11,8 @@ import { TestimonialsSection } from '../components/TestimonialsSection';
 import { FaqsSection } from '../components/FaqsSection';
 import { CtaSection } from '../components/CtaSection';
 import { Footer } from '../components/Footer';
-import { sendFacebookConversionEvent } from '@/api/functions';
-import { useToast } from '@/components/ui/use-toast';
+import { sendFacebookConversionEvent } from '@/functions/sendFacebookConversionEvent';
+import { Toaster, toast } from 'react-hot-toast';
 
 // Helper function to convert file to base64
 const fileToBase64 = (file) => {
@@ -28,7 +27,6 @@ const fileToBase64 = (file) => {
 export default function Home() {
   const [user, setUser] = useState(null);
   const navigate = useNavigate();
-  const { toast } = useToast();
   const [prompt, setPrompt] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -95,17 +93,18 @@ export default function Home() {
   }, []);
 
   const examplePrompts = [
-  "Create a dynamic 30-second ad for my running shoes showcasing speed and performance",
-  "Make a luxurious product showcase for my jewelry with elegant transitions",
-  "Generate an energetic ad for my fitness supplement highlighting results",
-  "Produce a clean and modern demo for my new tech gadget, focusing on ease of use"];
-
+  `My product is Nike-style running shoes with really good cushioning, super lightweight. My target audience are people who run or go to the gym regularly, like 25-45 year olds. My goal is to get them pumped up to hit their fitness goals and want to buy these shoes. My style is modern. My preferred colors are bright colors that pop, maybe blue and orange.`,
+  `My product is a beautiful diamond necklace, perfect for anniversaries or special nights out. My target audience are women buying for themselves or men buying gifts, around 30-50. My goal is to make them feel absolutely gorgeous and worth it. My style is luxury. My preferred colors are sparkly silver with soft romantic lighting.`,
+  `My product is high-quality vitamin D pills that actually work for boosting immunity. My target audience are health-focused people who care about what they put in their bodies, 35-65. My goal is to make them feel good about making a smart health choice they can trust. My style is minimalist. My preferred colors are clean whites and natural greens, nothing flashy.`,
+  `My product is an epic mechanical gaming keyboard with crazy RGB lights and smooth keys. My target audience are serious gamers and PC builders, mostly teens to 30s. My goal is to get them hyped about upgrading their gaming setup. My style is bold. My preferred colors are rainbow RGB effects with sleek black.`
+  ];
 
   const examplePromptsPreview = [
-  "Running shoes ad",
-  "Jewelry showcase",
-  "Fitness supplement",
-  "Tech product demo"];
+  "Running Shoes",
+  "Diamond Necklace",
+  "Health Supplement",
+  "Gaming Keyboard"
+  ];
 
 
   const handleFileSelect = (e) => {
@@ -144,11 +143,7 @@ export default function Home() {
     e.preventDefault();
 
     if (!selectedFile || !prompt.trim()) {
-      toast({
-        title: "Missing Information",
-        description: "Please upload an image and describe your video.",
-        variant: "destructive"
-      });
+      toast.error('Please upload an image and describe your video.');
       return;
     }
 
@@ -164,7 +159,6 @@ export default function Home() {
 
     try {
       if (!user) {
-        // Store the data for after authentication
         const fileBase64String = await fileToBase64(selectedFile);
 
         const pendingData = {
@@ -179,74 +173,31 @@ export default function Home() {
         sessionStorage.setItem('pendingChatData', JSON.stringify(pendingData));
         setShowAuthModal(true);
       } else {
-        // User is authenticated, proceed with video creation
-        const { Chat } = await import('@/api/entities');
-        const { Message } = await import('@/api/entities');
-        const { InvokeLLM } = await import('@/api/integrations');
-        console.log('Uploading file:', { name: selectedFile.name, size: selectedFile.size, type: selectedFile.type });
-        const { UploadFile } = await import('@/api/integrations');
+        const { Chat } = await import('@/entities/Chat');
+        const { Message } = await import('@/entities/Message');
+        const { UploadFile } = await import('@/integrations/Core');
 
         const newChat = await Chat.create({
           title: 'Creating brief...',
-          status: 'active',
+          status: 'draft',
           workflow_state: 'draft'
         });
 
         const { file_url } = await UploadFile({ file: selectedFile });
-        
-        // Validate that we got a proper URL, not base64
-        if (file_url && file_url.startsWith('data:')) {
-          throw new Error('File upload failed - received base64 URL instead of storage URL');
-        }
 
-        // Create user message
-        const userMessage = await Message.create({
+        await Message.create({
           chat_id: newChat.id,
           message_type: 'user',
           content: prompt.trim(),
           metadata: { image_url: file_url, is_initial_request: true }
         });
 
-        // Generate video brief using AI
-        console.log('Generating brief with OpenAI...', { prompt: prompt.trim(), image: file_url });
-
-        const llmResponse = await InvokeLLM({
-          prompt: prompt.trim(),
-          image_url: file_url,
-          max_tokens: 2000
-        });
-
-        console.log('OpenAI response received:', llmResponse);
-
-        const generatedBrief = llmResponse.response;
-
-        // Create assistant message with the brief
-        await Message.create({
-          chat_id: newChat.id,
-          message_type: 'assistant',
-          content: generatedBrief,
-          metadata: { 
-            is_brief: true,
-            brief_generated_at: new Date().toISOString()
-          }
-        });
-
-        // Update chat with brief and state
-        await Chat.update(newChat.id, {
-          workflow_state: 'awaiting_approval',
-          brief: generatedBrief
-        });
         sessionStorage.removeItem('pendingChatData');
-        console.log('Upload result:', { file_url });
         navigate(`/dashboard?chat=${newChat.id}`);
       }
     } catch (error) {
       console.error('Error submitting:', error);
-      toast({
-        title: "Error",
-        description: "Failed to create video request. Please try again.",
-        variant: "destructive"
-      });
+      toast.error('Failed to create video request. Please try again.');
       sessionStorage.removeItem('pendingChatData');
     } finally {
       setIsSubmitting(false);
@@ -287,12 +238,13 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-white" style={{ '--header-bg': 'rgba(255, 255, 255, 0.7)', '--text-dark': '#333', '--text-medium': '#666', '--text-light': '#999', '--accent-orange': '#F97316', '--accent-primary': '#60A5FA', '--accent-secondary': '#818CF8', '--surface-elevated': '#F3F4F6', '--input-border': '#E5E7EB', '--accent-success': '#10B981' }}>
+      <Toaster position="top-center" reverseOrder={false} />
       
       {/* Header */}
       <header className={`fixed top-0 inset-x-0 z-50 transition-all duration-300`}>
         <div className="max-w-5xl mx-2 md:mx-auto p-2 px-4 mt-4 bg-white/70 backdrop-blur-md rounded-2xl flex items-center justify-between shadow-lg">
           <Link to="/home" className="flex items-center gap-2">
-            <Logo size={32} className="w-8 h-8" />
+            <img src="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68b4aa46f5d6326ab93c3ed0/17cb8e7bc_vidutonobg.png" alt="Viduto Logo" className="w-8 h-8" />
             <span className="text-2xl font-light text-gray-900 tracking-tight hover:text-gray-700 transition-colors">
               Viduto
             </span>
@@ -337,8 +289,8 @@ export default function Home() {
               variant="ghost"
               size="icon"
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              className="w-8 h-8 ml-2"
-            >
+              className="w-8 h-8 ml-2">
+
               <Menu className="w-5 h-5 text-gray-700" />
             </Button>
           </div>
@@ -347,13 +299,12 @@ export default function Home() {
 
       <main className="relative z-10 flex flex-col items-center justify-center pt-32 pb-20 px-4 bg-gradient-to-br from-blue-100 via-purple-100 to-orange-100">
         <div className="w-full max-w-4xl mx-auto text-center">
-          <h2 className="text-4xl mt-4 md:mt-12 mb-4 mx-auto font-medium sm:text-5xl md:text-6xl leading-tight tracking-tight md:mb-6 md:whitespace-nowrap w-fit">Create viral videos <span className="bg-gradient-to-r from-blue-500 to-purple-600 bg-clip-text text-transparent">with your product.</span>
-
+          <h2 className="text-4xl mt-4 md:mt-12 mb-4 mx-auto font-medium sm:text-5xl md:text-6xl leading-tight tracking-tight md:mb-6 md:whitespace-nowrap w-fit">Create video ads <span className="bg-gradient-to-r from-blue-500 to-purple-600 bg-clip-text text-transparent">with your product.</span>
           </h2>
 
-          <p className="text-base sm:text-lg text-gray-600 mb-6 md:mb-8 max-w-2xl mx-auto leading-relaxed font-light md:whitespace-nowrap">Use one image of your product to create
-            <br className="md:hidden" />
-short-form videos by chatting with AI.
+          <p className="text-base sm:text-lg text-gray-600 mb-6 md:mb-8 max-w-2xl mx-auto leading-relaxed font-light md:whitespace-nowrap">Use one image of your product to create short-form videos by chatting with AI.
+
+
           </p>
 
           <form
@@ -419,7 +370,7 @@ short-form videos by chatting with AI.
             </div>
             
             <div className="flex justify-center gap-2 text-xs text-gray-700 font-light mt-4 mb-3">
-              <span>Not sure where to start?</span>
+              <span>Try this prompt templates:</span>
             </div>
             <div className="flex flex-wrap justify-center gap-2">
               {examplePromptsPreview.map((example, index) =>
@@ -529,12 +480,12 @@ short-form videos by chatting with AI.
       <Footer />
 
       <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
-      <MobileMenu 
-        isOpen={isMobileMenuOpen} 
-        onClose={() => setIsMobileMenuOpen(false)} 
-        user={user} 
-        handleAuthRequired={handleAuthRequired} 
-      />
-    </div>
-  );
+      <MobileMenu
+        isOpen={isMobileMenuOpen}
+        onClose={() => setIsMobileMenuOpen(false)}
+        user={user}
+        handleAuthRequired={handleAuthRequired} />
+
+    </div>);
+
 }
