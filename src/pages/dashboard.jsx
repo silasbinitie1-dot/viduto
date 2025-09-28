@@ -2,10 +2,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Menu, X, User as UserIcon, CreditCard, LogOut, Plus, MessageSquare, HelpCircle, Sun, Moon, Gift, Zap, Settings } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
-import { User } from '@/entities/User';
-import { Chat } from '@/entities/Chat';
-import { Message } from '@/entities/Message';
-import { UploadFile } from '@/integrations/Core';
+import { User, Chat, Message } from '@/api/entities';
+import { UploadFile } from '@/api/integrations';
 import { ChatInterface } from '../components/ChatInterface';
 import { Button } from '@/components/ui/button';
 import { HelpModal } from '../components/HelpModal';
