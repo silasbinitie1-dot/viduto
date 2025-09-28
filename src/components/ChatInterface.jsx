@@ -844,4 +844,5 @@ Each voiceover MUST be exactly 15 words using formula:
                 await Message.create({
                     chat_id: currentChatId,
                     message_type: 'assistant',
-                    content: '## ✅ Ready to Create?\n\nThis updated video plan incorporates your requeste
+                    content: '## ✅ Ready to Create?\n\nThis updated video plan incorporates your requested changes.',
+                    metadata: {
