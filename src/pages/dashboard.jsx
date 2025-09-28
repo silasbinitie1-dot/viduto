@@ -198,7 +198,6 @@ export default function Dashboard() {
           window.history.replaceState({}, '', '/dashboard');
         } else if (fromHomepage || pendingDataStr) {
           // Handle both cases: direct from homepage or with pending data
-           const pendingDataStr = sessionStorage.getItem('pendingChatData');
            if (pendingDataStr) {
              // Process pending data from homepage
               const pendingData = JSON.parse(pendingDataStr);

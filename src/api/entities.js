@@ -179,16 +179,9 @@ export const User = {
       .single()
 
     if (profileError) {
-      // If profile doesn't exist, return a default profile
-      console.log('User.me - Profile not found, returning default profile for:', user.email);
-      return {
-        id: user.id,
-        email: user.email,
-        full_name: user.user_metadata?.full_name || user.email.split('@')[0],
-        credits: 500, // Give demo credits
-        subscription_status: 'inactive',
-        current_plan: 'Free'
-      };
+      // If profile doesn't exist, this is an error - trigger should have created it
+      console.error('User.me - Profile not found for authenticated user:', user.email);
+      throw new Error('User profile not found. Please contact support.');
     }
 
     console.log('User.me - Profile found:', profile.email, 'Credits:', profile.credits)

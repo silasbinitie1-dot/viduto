@@ -252,8 +252,45 @@ export const ensureUserCredits = async () => {
 }
 
 export const setupNewUser = async () => {
-  // Mock setup new user
-  return { success: true, credits: 20 }
+  try {
+    // Get the current user's session token
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    
+    if (sessionError || !session?.access_token) {
+      throw new Error('Not authenticated - please log in again')
+    }
+
+    const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/setup-new-user`
+    
+    const headers = {
+      'Authorization': `Bearer ${session.access_token}`,
+      'Content-Type': 'application/json',
+    }
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({})
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('Setup New User API Error Response:', errorText)
+      let errorData
+      try {
+        errorData = JSON.parse(errorText)
+      } catch {
+        errorData = { error: errorText }
+      }
+      throw new Error(errorData.error || 'Failed to setup new user')
+    }
+
+    const result = await response.json()
+    return result
+  } catch (error) {
+    console.error('Error setting up new user:', error)
+    throw error
+  }
 }
 
 export const syncUserWithStripe = async () => {
