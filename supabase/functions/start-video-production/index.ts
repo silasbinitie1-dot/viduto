@@ -17,6 +17,15 @@ interface VideoProductionRequest {
   parentVideoUuid?: string
   originalVideoUuid?: string
   revisionRequest?: string
+  // Additional fields for initial video workflow
+  videoId?: string
+  video_id?: string
+  messageId?: string
+  message_id?: string
+  prompt?: string
+  image_url?: string
+  chat_id?: string
+  credits_used?: number
 }
 
 Deno.serve(async (req: Request) => {
@@ -76,15 +85,48 @@ Deno.serve(async (req: Request) => {
       originalVideoId,
       parentVideoUuid,
       originalVideoUuid,
-      revisionRequest
+      revisionRequest,
+      // Additional fields for initial video workflow
+      videoId: bodyVideoId,
+      video_id: bodyVideoIdSnake,
+      messageId,
+      message_id: messageIdSnake,
+      prompt,
+      image_url: imageUrlSnake,
+      chat_id: chatIdSnake,
+      credits_used: creditsUsedSnake
     }: VideoProductionRequest = await req.json()
+    
+    // Normalize parameters to support both camelCase and snake_case
+    const normalizedBrief = brief || prompt
+    const normalizedImageUrl = imageUrl || imageUrlSnake
+    const normalizedChatId = chatId || chatIdSnake
+    const normalizedMessageId = messageId || messageIdSnake
+    const normalizedCreditsUsed = creditsUsed || creditsUsedSnake || 10
+    
+    // Generate video ID if not provided
+    let normalizedVideoId = bodyVideoId || bodyVideoIdSnake
+    if (!normalizedVideoId) {
+      if (!normalizedChatId) {
+        console.log('❌ Missing chatId for video ID generation')
+        return new Response(
+          JSON.stringify({ 
+            success: false, 
+            error: 'chatId/chat_id is required when generating a new video_id'
+          }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+      normalizedVideoId = `video_${normalizedChatId}_${Date.now()}`
+    }
     
     console.log('=== START VIDEO PRODUCTION ===')
     console.log('User:', user.email)
-    console.log('Chat ID:', chatId)
-    console.log('Credits Used:', creditsUsed)
-    console.log('Brief length:', brief?.length || 0)
-    console.log('Image URL:', imageUrl)
+    console.log('Chat ID:', normalizedChatId)
+    console.log('Video ID:', normalizedVideoId)
+    console.log('Credits Used:', normalizedCreditsUsed)
+    console.log('Brief length:', normalizedBrief?.length || 0)
+    console.log('Image URL:', normalizedImageUrl)
     console.log('Is Revision:', isRevision)
     if (isRevision) {
       console.log('Parent Video ID:', parentVideoId)
@@ -92,13 +134,13 @@ Deno.serve(async (req: Request) => {
       console.log('Revision Request:', revisionRequest)
     }
 
-    if (!chatId || !brief) {
-      console.log('❌ Missing required fields:', { chatId: !!chatId, brief: !!brief })
+    if (!normalizedChatId || !normalizedBrief) {
+      console.log('❌ Missing required fields:', { chatId: !!normalizedChatId, brief: !!normalizedBrief })
       return new Response(
         JSON.stringify({ 
           success: false, 
           error: 'Missing required parameters',
-          required: ['chatId', 'brief']
+          required: ['chatId/chat_id', 'brief/prompt']
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
@@ -109,7 +151,7 @@ Deno.serve(async (req: Request) => {
     const { data: chat, error: chatError } = await supabase
       .from('chat')
       .select('user_id')
-      .eq('id', chatId)
+      .eq('id', normalizedChatId)
       .single()
 
     if (chatError || !chat) {
@@ -146,13 +188,13 @@ Deno.serve(async (req: Request) => {
     }
     console.log('✅ User profile found:', { credits: userProfile.credits, email: userProfile.email })
 
-    if ((userProfile.credits || 0) < creditsUsed) {
-      console.log('❌ Insufficient credits:', { available: userProfile.credits, required: creditsUsed })
+    if ((userProfile.credits || 0) < normalizedCreditsUsed) {
+      console.log('❌ Insufficient credits:', { available: userProfile.credits, required: normalizedCreditsUsed })
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: `Insufficient credits. You need ${creditsUsed} credits to ${isRevision ? 'create a revision' : 'start video production'}.`,
-          credits_required: creditsUsed,
+          error: `Insufficient credits. You need ${normalizedCreditsUsed} credits to ${isRevision ? 'create a revision' : 'start video production'}.`,
+          credits_required: normalizedCreditsUsed,
           credits_available: userProfile.credits || 0
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -161,22 +203,21 @@ Deno.serve(async (req: Request) => {
     console.log('✅ Credits check passed')
 
     // Generate unique video ID
-    const timestamp = Date.now()
-    const video_id = `video_${chatId}_${timestamp}`
-    console.log('🆔 Generated video_id:', video_id)
+    console.log('🆔 Using video_id:', normalizedVideoId)
 
     // Create video record IMMEDIATELY before starting N8N workflow
     console.log('📝 Creating video record in database...')
     const videoRecord = {
       id: crypto.randomUUID(),
-      chat_id: chatId,
-      video_id: video_id,
-      prompt: brief.length > 1000 ? brief.substring(0, 1000) : brief,
-      image_url: imageUrl,
+      chat_id: normalizedChatId,
+      video_id: normalizedVideoId,
+      message_id: normalizedMessageId,
+      prompt: normalizedBrief.length > 1000 ? normalizedBrief.substring(0, 1000) : normalizedBrief,
+      image_url: normalizedImageUrl,
       status: 'processing',
-      credits_used: creditsUsed,
+      credits_used: normalizedCreditsUsed,
       processing_started_at: new Date().toISOString(),
-      idempotency_key: `${chatId}_${timestamp}`,
+      idempotency_key: `${normalizedChatId}_${Date.now()}`,
       retry_count: 0,
       is_revision: isRevision,
       original_video_id: isRevision ? (originalVideoUuid || null) : null
@@ -198,8 +239,8 @@ Deno.serve(async (req: Request) => {
     console.log('✅ Video record created successfully:', video.id)
 
     // Deduct credits
-    console.log('💳 Deducting credits:', { from: userProfile.credits, amount: creditsUsed, remaining: userProfile.credits - creditsUsed })
-    const newCredits = (userProfile.credits || 0) - creditsUsed
+    console.log('💳 Deducting credits:', { from: userProfile.credits, amount: normalizedCreditsUsed, remaining: userProfile.credits - normalizedCreditsUsed })
+    const newCredits = (userProfile.credits || 0) - normalizedCreditsUsed
     const { error: creditError } = await supabase
       .from('users')
       .update({ credits: newCredits })
@@ -225,7 +266,7 @@ Deno.serve(async (req: Request) => {
         active_video_id: video.id,
         production_started_at: new Date().toISOString()
       })
-      .eq('id', chatId)
+      .eq('id', normalizedChatId)
     
     if (chatUpdateError) {
       console.log('❌ Chat state update failed:', chatUpdateError.message)
@@ -263,19 +304,19 @@ Deno.serve(async (req: Request) => {
 
     // Prepare N8N webhook payload
     const webhookPayload: any = {
-      video_id: video_id,
-      chat_id: chatId,
+      prompt: normalizedBrief,
+      image_url: normalizedImageUrl,
+      video_id: normalizedVideoId,
+      chat_id: normalizedChatId,
       user_id: user.id,
       user_email: user.email,
       user_name: userProfile.full_name || user.email,
-      prompt: brief,
-      image_url: imageUrl,
       is_revision: isRevision,
       request_timestamp: new Date().toISOString(),
       source: "Viduto",
       version: "1.0",
-      callback_url: `https://mpypysymoauwwyjqtwxr.supabase.co/functions/v1/n8n-video-callback`,
-      task_id: `task_${video_id}`
+      callback_url: `${Deno.env.get('SUPABASE_URL')}/functions/v1/n8n-video-callback`,
+      task_id: `task_${normalizedVideoId}`
     }
 
     // Add revision-specific fields if this is a revision
@@ -317,7 +358,7 @@ Deno.serve(async (req: Request) => {
         await supabase.from('chat').update({
           workflow_state: 'awaiting_approval',
           active_video_id: null
-        }).eq('id', chatId)
+        }).eq('id', normalizedChatId)
         await supabase.from('video').update({
           status: 'failed',
           error_message: `N8N webhook failed: ${responseText}`,
@@ -375,28 +416,30 @@ Deno.serve(async (req: Request) => {
         status: 'success', 
         message: `Video ${isRevision ? 'revision' : 'production'} started successfully`,
         metadata: {
-          video_id: video_id,
-          chat_id: chatId,
-          credits_used: creditsUsed
+          video_id: normalizedVideoId,
+          chat_id: normalizedChatId,
+          credits_used: normalizedCreditsUsed
         }
       })
     console.log('✅ System log entry created')
 
     console.log('🎉 Video production started successfully:', {
-      video_id,
-      chat_id: chatId,
+      video_id: normalizedVideoId,
+      chat_id: normalizedChatId,
       estimated_completion: new Date(Date.now() + (isRevision ? 5 : 12) * 60 * 1000).toISOString()
     })
 
     return new Response(
       JSON.stringify({
         success: true,
-        video_id: video_id,
-        videoId: video_id, // Add camelCase version for frontend compatibility
+        video_id: normalizedVideoId,
+        videoId: normalizedVideoId, // Add camelCase version for frontend compatibility
+        chat_id: normalizedChatId,
         message: `Video ${isRevision ? 'revision' : 'production'} started successfully`,
         estimated_completion: new Date(Date.now() + (isRevision ? 5 : 12) * 60 * 1000).toISOString(),
         webhook_called: true,
-        credits_remaining: newCredits
+        credits_remaining: newCredits,
+        video_record: video
       }),
       {
         status: 200,
