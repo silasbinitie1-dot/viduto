@@ -194,7 +194,7 @@ export default function Layout({ children, currentPageName }) {
     "@type": "Organization",
     "name": "Viduto",
     "url": baseUrl,
-    "logo": "https://base44.com/logo_v2.svg"
+    "logo": `${baseUrl}/viduto logo transparent.png`
   };
 
   const websiteJsonLd = {
@@ -255,9 +255,9 @@ export default function Layout({ children, currentPageName }) {
       `}</style>
       
       {/* Favicon */}
-      <link rel="icon" type="image/svg+xml" href="https://base44.com/logo_v2.svg" />
-      <link rel="shortcut icon" type="image/svg+xml" href="https://base44.com/logo_v2.svg" />
-      <link rel="apple-touch-icon" sizes="180x180" href="https://base44.com/logo_v2.svg" />
+      <link rel="icon" type="image/png" href="/viduto logo transparent.png" />
+      <link rel="shortcut icon" type="image/png" href="/viduto logo transparent.png" />
+      <link rel="apple-touch-icon" sizes="180x180" href="/viduto logo transparent.png" />
       
       {/* Dynamic SEO meta */}
       <title>{current.title}</title>

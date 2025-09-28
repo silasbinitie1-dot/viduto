@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 
 export default function Logo({ size = 32, className = "", title = "Viduto" }) {
   const [failed, setFailed] = useState(false);
-  const src = "https://base44.com/logo_v2.svg";
+  const src = "/viduto logo transparent.png";
 
   if (failed) {
     return (
