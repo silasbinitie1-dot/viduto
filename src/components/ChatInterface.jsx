@@ -1,11 +1,8 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Send, Upload, X, Loader2, Play, Download, AlertCircle } from 'lucide-react';
-import { Chat } from '@/entities/Chat';
-import { Message } from '@/entities/Message';
-import { User } from '@/entities/User';
+import { Chat, Message, User } from '@/api/entities';
 import { Video } from '@/entities/Video';
 import { UploadFile } from '@/integrations/Core';
 import { InvokeLLM } from '@/integrations/Core';
@@ -1106,7 +1103,7 @@ Each voiceover MUST be exactly 15 words using formula:
                 await Message.create({
                     chat_id: currentChatId,
                     message_type: 'system',
-                    content: '🔧 Preparing your video environment...\n\n✨ AI is creating your video. This will take about 6 minutes. Progress may appear to jump at first — that’s normal.',
+                    content: '🔧 Preparing your video environment...\n\n✨ AI is creating your video. This will take about 6 minutes. Progress may appear to jump at first — that's normal.',
                     metadata: {
                         production_initiated: true,
                         estimate_minutes: 6,
@@ -1707,11 +1704,11 @@ Each voiceover MUST be exactly 15 words using formula:
         if (message.metadata?.video_completed && message.metadata?.video_url) {
             const guidanceCopy = `🎉 **Your video is ready!**
 
-✨ AI isn’t perfect—first drafts may need tweaks. That’s totally normal.
+✨ AI isn't perfect—first drafts may need tweaks. That's totally normal.
 
 Try asking for changes like:
-- “Change the second scene to something more fun and attention‑grabbing”
-- “Change the text from … to …”
+- "Change the second scene to something more fun and attention‑grabbing"
+- "Change the text from … to …"
 
 💳 **Each revision costs 2.5 credits.**  
 ✅ Usually **2–3 revisions** are enough to get an excellent final result.`;
@@ -2064,7 +2061,7 @@ Try asking for changes like:
                                 />
                                 {/* NEW: explanatory microcopy to reduce confusion on early progress */}
                                 <div className={`mt-2 text-xs ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
-                                    Note: Initial setup takes a few seconds, and progress may appear to jump at first — that’s normal.
+                                    Note: Initial setup takes a few seconds, and progress may appear to jump at first — that's normal.
                                 </div>
                             </div>
                         )}
