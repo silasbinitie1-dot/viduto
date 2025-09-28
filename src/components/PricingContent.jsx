@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import { User } from '@/api/entities';
 import { useNavigate } from 'react-router-dom';
 import { AuthModal } from '@/components/AuthModal';
-import { sendFacebookConversionEvent } from '@/functions/sendFacebookConversionEvent';
+import { sendFacebookConversionEvent } from '@/api/functions';
 import { useToast } from '@/components/ui/use-toast';
 import { createStripeCheckoutSession, createStripeCustomerPortal } from '@/api/functions';
 
