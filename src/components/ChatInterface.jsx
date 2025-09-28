@@ -515,7 +515,7 @@ const prompt = `Create a video plan for: ${userText}`;            const brief = 
                 await Message.create({
                     chat_id: chatId,
                     message_type: 'system',
-                    content: '❌ **Video generation timed out**\n\nThe video took longer than expected to generate. Your credits have been automatically refunded. Please try again.',
+                    content: `🔧 Preparing your video environment...\n\n✨ AI is creating your video. This will take about 6 minutes. Progress may appear to jump at first — that's normal.`,
                     metadata: {
                         timeout: true,
                         credits_refunded: chat.brief && chat.active_video_id ? 2.5 : 10, // Adjusted refund for revision if applicable
@@ -844,5 +844,758 @@ Each voiceover MUST be exactly 15 words using formula:
                 await Message.create({
                     chat_id: currentChatId,
                     message_type: 'assistant',
-                    content: '## ✅ Ready to Create?\n\nThis updated video plan incorporates your requested changes.',
+                    content: '## ✅ Ready to Create?\n\nThis updated video plan incorporates your requested changes.\n\nYou can:\n• Request further changes\n• Approve and start production (costs 10 credits)',
                     metadata: {
+                        is_approval_section: true,
+                        brief_content: updatedBrief,
+                        image_url: originalImgUrl,
+                        llm_image_url: llmSafeUrl || undefined,
+                        original_prompt: briefMessage.metadata.original_prompt,
+                        product_name: updatedProductName,
+                        generation_id: `approval_updated_${Date.now()}`
+                    }
+                });
+            }
+
+            await Chat.update(currentChatId, { brief: updatedBrief });
+
+            if (loadingMessageId) {
+                await Message.update(loadingMessageId, {
+                    metadata: {
+                        is_brief_loading: false,
+                        brief_loading_resolved_at: new Date().toISOString()
+                    }
+                });
+            }
+
+            await loadChatData(true);
+        } catch (err) {
+            console.error('modifyVideoBrief error:', err);
+            toast.error('Failed to update the video plan. Please try again.');
+            if (loadingMessageId) {
+                try {
+                    await Message.update(loadingMessageId, {
+                        metadata: {
+                            is_brief_loading: false,
+                            brief_loading_resolved_at: new Date().toISOString()
+                        }
+                    });
+                } catch {}
+            }
+        }
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!input.trim() && !selectedFile) return;
+
+        const userText = input.trim();
+        setInput('');
+        setIsLoading(true);
+
+        try {
+            let uploadedFileUrl = '';
+            if (selectedFile) {
+                const { file_url } = await UploadFile({ file: selectedFile });
+                uploadedFileUrl = file_url;
+                setFileUrl(file_url);
+                setSelectedFile(null);
+                if (fileInputRef.current) {
+                    fileInputRef.current.value = '';
+                }
+            }
+
+            let currentChatId = chatId;
+
+            if (!currentChatId) {
+                const newChat = await Chat.create({
+                    title: userText.slice(0, 50) + (userText.length > 50 ? '...' : ''),
+                    workflow_state: 'draft'
+                });
+                currentChatId = newChat.id;
+                onNewChat?.(newChat);
+            }
+
+            if (chat?.workflow_state === 'draft') {
+                await Message.create({
+                    chat_id: currentChatId,
+                    message_type: 'user',
+                    content: userText,
+                    metadata: {
+                        is_initial_request: true,
+                        image_url: uploadedFileUrl || undefined,
+                        generation_id: `initial_request_${Date.now()}`
+                    }
+                });
+            } else if (chat?.workflow_state === 'awaiting_approval') {
+                const messages = await Message.filter({ chat_id: currentChatId }, 'created_date');
+                const latestBriefMessage = messages
+                    .filter(m => m.metadata?.is_brief)
+                    .sort((a, b) => new Date(b.created_date) - new Date(a.created_date))[0];
+
+                if (!latestBriefMessage) {
+                    toast.error('No video plan found to modify.');
+                    return;
+                }
+
+                await Message.create({
+                    chat_id: currentChatId,
+                    message_type: 'user',
+                    content: userText,
+                    metadata: {
+                        is_modification_request: true,
+                        generation_id: `modification_request_${Date.now()}`
+                    }
+                });
+
+                const loadingMsg = await Message.create({
+                    chat_id: currentChatId,
+                    message_type: 'assistant',
+                    content: '🔄 Updating your video plan...\n\nIncorporating your feedback into the plan.',
+                    metadata: {
+                        is_brief_loading: true,
+                        generation_id: `brief_loading_${Date.now()}`
+                    }
+                });
+
+                await modifyVideoBrief(userText, latestBriefMessage, currentChatId, loadingMsg.id);
+            } else {
+                await Message.create({
+                    chat_id: currentChatId,
+                    message_type: 'user',
+                    content: userText,
+                    metadata: {
+                        image_url: uploadedFileUrl || undefined,
+                        generation_id: `user_message_${Date.now()}`
+                    }
+                });
+
+                const llmSafeUrl = await getLlmSafeImageUrl(uploadedFileUrl);
+
+                const response = await InvokeLLM({
+                    prompt: userText,
+                    file_urls: llmSafeUrl ? [llmSafeUrl] : undefined,
+                    add_context_from_internet: false
+                });
+
+                await Message.create({
+                    chat_id: currentChatId,
+                    message_type: 'assistant',
+                    content: response,
+                    metadata: {
+                        generation_id: `assistant_response_${Date.now()}`
+                    }
+                });
+            }
+
+            await loadChatData(true);
+            onChatUpdate?.();
+        } catch (error) {
+            console.error('Error sending message:', error);
+            toast.error('Failed to send message. Please try again.');
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleApprove = async (briefMessage) => {
+        if (!user || user.credits < 10) {
+            setShowCreditsModal(true);
+            return;
+        }
+
+        try {
+            setIsGeneratingBrief(true);
+
+            const productionMsg = await Message.create({
+                chat_id: chatId,
+                message_type: 'system',
+                content: `🔧 Preparing your video environment...\n\n✨ AI is creating your video. This will take about 6 minutes. Progress may appear to jump at first — that's normal.`,
+                metadata: {
+                    is_production_start: true,
+                    brief_content: briefMessage.metadata.brief_content,
+                    image_url: briefMessage.metadata.image_url,
+                    llm_image_url: briefMessage.metadata.llm_image_url,
+                    original_prompt: briefMessage.metadata.original_prompt,
+                    product_name: briefMessage.metadata.product_name,
+                    generation_id: `production_start_${Date.now()}`
+                }
+            });
+
+            const result = await startVideoProduction({
+                chatId: chatId,
+                brief: briefMessage.metadata.brief_content,
+                imageUrl: briefMessage.metadata.llm_image_url || briefMessage.metadata.image_url,
+                originalPrompt: briefMessage.metadata.original_prompt,
+                productName: briefMessage.metadata.product_name
+            });
+
+            await loadChatData(true);
+            onChatUpdate?.();
+            onCreditsRefreshed?.();
+
+            toast.success('Video production started! This will take about 6 minutes.');
+        } catch (error) {
+            console.error('Error starting video production:', error);
+            
+            let errorMessage = 'Failed to start video production. Please try again.';
+            
+            if (error?.message?.includes('insufficient credits')) {
+                errorMessage = 'Insufficient credits. Please add more credits to continue.';
+                setShowCreditsModal(true);
+            } else if (error?.message?.includes('rate limit')) {
+                errorMessage = 'Rate limit reached. Please wait a moment before trying again.';
+            }
+            
+            toast.error(errorMessage);
+        } finally {
+            setIsGeneratingBrief(false);
+        }
+    };
+
+    const handleRevision = async (videoId, revisionPrompt) => {
+        if (!user || user.credits < 2.5) {
+            setShowCreditsModal(true);
+            return;
+        }
+
+        try {
+            const revisionMsg = await Message.create({
+                chat_id: chatId,
+                message_type: 'system',
+                content: `🔄 **Creating Revision**\n\nYour feedback: "${revisionPrompt}"\n\nGenerating an improved version of your video. This will take about 6 minutes.`,
+                metadata: {
+                    revision_in_progress: true,
+                    video_id: videoId,
+                    revision_prompt: revisionPrompt,
+                    generation_id: `revision_start_${Date.now()}`
+                }
+            });
+
+            const result = await triggerRevisionWorkflow({
+                videoId: videoId,
+                revisionPrompt: revisionPrompt,
+                chatId: chatId
+            });
+
+            await loadChatData(true);
+            onChatUpdate?.();
+            onCreditsRefreshed?.();
+
+            toast.success('Video revision started! This will take about 6 minutes.');
+        } catch (error) {
+            console.error('Error starting video revision:', error);
+            
+            let errorMessage = 'Failed to start video revision. Please try again.';
+            
+            if (error?.message?.includes('insufficient credits')) {
+                errorMessage = 'Insufficient credits. Please add more credits to continue.';
+                setShowCreditsModal(true);
+            } else if (error?.message?.includes('rate limit')) {
+                errorMessage = 'Rate limit reached. Please wait a moment before trying again.';
+            }
+            
+            toast.error(errorMessage);
+        }
+    };
+
+    const handleCancel = async () => {
+        if (!chat?.active_video_id) return;
+
+        try {
+            setIsCancelling(true);
+
+            await lockingManager({
+                action: 'release',
+                chatId: chatId
+            });
+
+            await Message.create({
+                chat_id: chatId,
+                message_type: 'system',
+                content: '⏹️ **Video Production Cancelled**\n\nYour credits have been refunded.',
+                metadata: {
+                    production_cancelled: true,
+                    credits_refunded: 10,
+                    generation_id: `production_cancelled_${Date.now()}`
+                }
+            });
+
+            await Chat.update(chatId, {
+                workflow_state: 'completed',
+                active_video_id: null
+            });
+
+            await loadChatData(true);
+            onChatUpdate?.();
+            onCreditsRefreshed?.();
+
+            toast.success('Video production cancelled. Credits have been refunded.');
+        } catch (error) {
+            console.error('Error cancelling production:', error);
+            toast.error('Failed to cancel production. Please try again.');
+        } finally {
+            setIsCancelling(false);
+        }
+    };
+
+    const handleTemplateSelect = (template) => {
+        setInput(template.text);
+    };
+
+    const renderMessage = (message) => {
+        const isUser = message.message_type === 'user';
+        const isSystem = message.message_type === 'system';
+
+        if (message.metadata?.is_brief_loading && !message.metadata?.brief_loading_resolved_at) {
+            return null;
+        }
+
+        if (message.metadata?.is_brief) {
+            return (
+                <div key={message.id} className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
+                    <div className={`max-w-[85%] rounded-lg p-4 ${
+                        isUser 
+                            ? 'bg-blue-500 text-white' 
+                            : isSystem 
+                                ? 'bg-yellow-50 border border-yellow-200 text-yellow-800'
+                                : darkMode 
+                                    ? 'bg-gray-700 text-white' 
+                                    : 'bg-gray-100 text-gray-900'
+                    }`}>
+                        <ReactMarkdown className="prose prose-sm max-w-none dark:prose-invert">
+                            {message.content}
+                        </ReactMarkdown>
+                        {message.metadata?.image_url && (
+                            <div className="mt-3">
+                                <img 
+                                    src={message.metadata.image_url} 
+                                    alt="Product" 
+                                    className="max-w-full h-auto rounded-lg"
+                                    style={{ maxHeight: '200px' }}
+                                />
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        if (message.metadata?.is_approval_section) {
+            return (
+                <div key={message.id} className="mb-4">
+                    <div className={`max-w-[85%] rounded-lg p-4 ${
+                        darkMode ? 'bg-gray-700 text-white' : 'bg-gray-100 text-gray-900'
+                    }`}>
+                        <ReactMarkdown className="prose prose-sm max-w-none dark:prose-invert">
+                            {message.content}
+                        </ReactMarkdown>
+                        <div className="flex gap-3 mt-4">
+                            <Button 
+                                onClick={() => handleApprove(message)}
+                                disabled={isGeneratingBrief || !user || user.credits < 10}
+                                className="bg-green-600 hover:bg-green-700 text-white"
+                            >
+                                {isGeneratingBrief ? (
+                                    <>
+                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                        Starting Production...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Play className="w-4 h-4 mr-2" />
+                                        Approve & Create Video (10 credits)
+                                    </>
+                                )}
+                            </Button>
+                            {(!user || user.credits < 10) && (
+                                <Button 
+                                    onClick={() => setShowCreditsModal(true)}
+                                    variant="outline"
+                                    className="border-blue-500 text-blue-500 hover:bg-blue-50"
+                                >
+                                    <AlertCircle className="w-4 h-4 mr-2" />
+                                    Add Credits
+                                </Button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        if (message.metadata?.is_production_start) {
+            return (
+                <div key={message.id} className="mb-4">
+                    <div className={`max-w-[85%] rounded-lg p-4 ${
+                        darkMode ? 'bg-blue-900 text-blue-100' : 'bg-blue-50 text-blue-900'
+                    }`}>
+                        <ReactMarkdown className="prose prose-sm max-w-none dark:prose-invert">
+                            {message.content}
+                        </ReactMarkdown>
+                        {chat?.workflow_state === 'in_production' && chat?.active_video_id && (
+                            <div className="mt-4">
+                                <ProductionProgress 
+                                    videoId={chat.active_video_id}
+                                    onCancel={handleCancel}
+                                    isCancelling={isCancelling}
+                                />
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        if (message.metadata?.revision_in_progress || message.metadata?.finalizing_revision) {
+            return (
+                <div key={message.id} className="mb-4">
+                    <div className={`max-w-[85%] rounded-lg p-4 ${
+                        darkMode ? 'bg-purple-900 text-purple-100' : 'bg-purple-50 text-purple-900'
+                    }`}>
+                        <ReactMarkdown className="prose prose-sm max-w-none dark:prose-invert">
+                            {message.content}
+                        </ReactMarkdown>
+                        <div className="mt-4">
+                            <RevisionProgressInline 
+                                message={message}
+                                onRevisionComplete={() => {
+                                    loadChatData(true);
+                                    onChatUpdate?.();
+                                    onCreditsRefreshed?.();
+                                }}
+                                playVideoReadySound={playVideoReadySound}
+                            />
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+
+        if (message.metadata?.video_ready) {
+            const video = message.metadata.video;
+            return (
+                <div key={message.id} className="mb-4">
+                    <div className={`max-w-[85%] rounded-lg p-4 ${
+                        darkMode ? 'bg-green-900 text-green-100' : 'bg-green-50 text-green-900'
+                    }`}>
+                        <ReactMarkdown className="prose prose-sm max-w-none dark:prose-invert">
+                            {message.content}
+                        </ReactMarkdown>
+                        {video && (
+                            <div className="mt-4 space-y-3">
+                                <video 
+                                    controls 
+                                    className="w-full rounded-lg"
+                                    style={{ maxHeight: '400px' }}
+                                >
+                                    <source src={video.video_url} type="video/mp4" />
+                                    Your browser does not support the video tag.
+                                </video>
+                                <div className="flex gap-2">
+                                    <Button
+                                        onClick={() => window.open(video.video_url, '_blank')}
+                                        className="bg-blue-600 hover:bg-blue-700 text-white"
+                                    >
+                                        <Download className="w-4 h-4 mr-2" />
+                                        Download Video
+                                    </Button>
+                                    <Button
+                                        onClick={() => {
+                                            const revisionPrompt = prompt('What would you like to change about this video?');
+                                            if (revisionPrompt) {
+                                                handleRevision(video.id, revisionPrompt);
+                                            }
+                                        }}
+                                        variant="outline"
+                                        className="border-purple-500 text-purple-500 hover:bg-purple-50"
+                                        disabled={!user || user.credits < 2.5}
+                                    >
+                                        🔄 Create Revision (2.5 credits)
+                                    </Button>
+                                </div>
+                                {(!user || user.credits < 2.5) && (
+                                    <p className="text-sm text-gray-600">
+                                        Need more credits for revisions? 
+                                        <button 
+                                            onClick={() => setShowCreditsModal(true)}
+                                            className="text-blue-500 hover:underline ml-1"
+                                        >
+                                            Add credits
+                                        </button>
+                                    </p>
+                                )}
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        }
+
+        return (
+            <div key={message.id} className={`flex ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
+                <div className={`max-w-[85%] rounded-lg p-4 ${
+                    isUser 
+                        ? 'bg-blue-500 text-white' 
+                        : isSystem 
+                            ? 'bg-yellow-50 border border-yellow-200 text-yellow-800'
+                            : darkMode 
+                                ? 'bg-gray-700 text-white' 
+                                : 'bg-gray-100 text-gray-900'
+                }`}>
+                    <ReactMarkdown className="prose prose-sm max-w-none dark:prose-invert">
+                        {message.content}
+                    </ReactMarkdown>
+                    {message.metadata?.image_url && (
+                        <div className="mt-3">
+                            <img 
+                                src={message.metadata.image_url} 
+                                alt="Uploaded" 
+                                className="max-w-full h-auto rounded-lg"
+                                style={{ maxHeight: '200px' }}
+                            />
+                        </div>
+                    )}
+                </div>
+            </div>
+        );
+    };
+
+    if (!chatId) {
+        return (
+            <div className={`flex-1 flex flex-col items-center justify-center p-8 ${darkMode ? 'bg-gray-900 text-white' : 'bg-white text-gray-900'}`}>
+                <div className="max-w-4xl w-full">
+                    <div className="text-center mb-8">
+                        <h1 className="text-4xl font-bold mb-4">Create Your Product Video</h1>
+                        <p className="text-xl text-gray-600 dark:text-gray-300">
+                            Upload a product image and describe your vision. AI will create a professional 30-second video.
+                        </p>
+                    </div>
+
+                    <div className="mb-8">
+                        <h2 className="text-2xl font-semibold mb-4">Quick Start Templates</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {promptTemplates.map((template, index) => (
+                                <div 
+                                    key={index}
+                                    onClick={() => handleTemplateSelect(template)}
+                                    className={`p-4 rounded-lg border-2 border-dashed cursor-pointer transition-all hover:border-blue-500 ${
+                                        darkMode 
+                                            ? 'border-gray-600 hover:bg-gray-800' 
+                                            : 'border-gray-300 hover:bg-gray-50'
+                                    }`}
+                                >
+                                    <h3 className="font-semibold text-lg mb-2">{template.label}</h3>
+                                    <p className="text-sm text-gray-600 dark:text-gray-400 line-clamp-3">
+                                        {template.text}
+                                    </p>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+
+                    <form onSubmit={handleSubmit} className="space-y-4">
+                        <div className="flex gap-4">
+                            <div className="flex-1">
+                                <Textarea
+                                    value={input}
+                                    onChange={(e) => setInput(e.target.value)}
+                                    placeholder="Describe your product and target audience... (e.g., 'My product is wireless headphones for gamers who want premium sound quality. Target audience is 18-35 year old gamers. Style should be modern and energetic with blue/purple colors.')"
+                                    className={`min-h-[120px] resize-none ${darkMode ? 'bg-gray-800 border-gray-600' : 'bg-white border-gray-300'}`}
+                                    disabled={isLoading}
+                                />
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-4">
+                            <input
+                                type="file"
+                                ref={fileInputRef}
+                                onChange={handleFileSelect}
+                                accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/jpg,image/png,image/webp"
+                                className="hidden"
+                            />
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => fileInputRef.current?.click()}
+                                className="flex items-center gap-2"
+                            >
+                                <Upload className="w-4 h-4" />
+                                Upload Product Image
+                            </Button>
+                            
+                            {selectedFile && (
+                                <div className="flex items-center gap-2">
+                                    <span className="text-sm text-gray-600 dark:text-gray-400">
+                                        {selectedFile.name}
+                                    </span>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => {
+                                            setSelectedFile(null);
+                                            if (fileInputRef.current) {
+                                                fileInputRef.current.value = '';
+                                            }
+                                        }}
+                                    >
+                                        <X className="w-4 h-4" />
+                                    </Button>
+                                </div>
+                            )}
+                        </div>
+
+                        <Button
+                            type="submit"
+                            disabled={isLoading || (!input.trim() && !selectedFile)}
+                            className="w-full bg-blue-600 hover:bg-blue-700 text-white py-3"
+                        >
+                            {isLoading ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    Creating Video Plan...
+                                </>
+                            ) : (
+                                <>
+                                    <Send className="w-4 h-4 mr-2" />
+                                    Create Video Plan
+                                </>
+                            )}
+                        </Button>
+                    </form>
+
+                    <div className="mt-8 text-center text-sm text-gray-500 dark:text-gray-400">
+                        <p>Supported formats: WEBP, PNG, JPEG • Video creation costs 10 credits • Revisions cost 2.5 credits</p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    return (
+        <div className={`flex-1 flex flex-col ${darkMode ? 'bg-gray-900' : 'bg-white'}`}>
+            {/* Chat Header */}
+            <div className={`border-b p-4 ${darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50'}`}>
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h2 className={`text-lg font-semibold ${darkMode ? 'text-white' : 'text-gray-900'}`}>
+                            {chat?.title || 'New Video Project'}
+                        </h2>
+                        <p className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                            {chat?.workflow_state === 'draft' && 'Planning your video...'}
+                            {chat?.workflow_state === 'awaiting_approval' && 'Ready for your approval'}
+                            {chat?.workflow_state === 'in_production' && 'Creating your video...'}
+                            {chat?.workflow_state === 'completed' && 'Video completed'}
+                        </p>
+                    </div>
+                    {user && (
+                        <div className={`text-sm ${darkMode ? 'text-gray-400' : 'text-gray-600'}`}>
+                            Credits: {user.credits}
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {isFetchingOlder && (
+                    <div className="text-center py-2">
+                        <Loader2 className="w-4 h-4 animate-spin inline-block mr-2" />
+                        <span className="text-sm text-gray-500">Loading older messages...</span>
+                    </div>
+                )}
+                
+                {messages.map(renderMessage)}
+                <div ref={messagesEndRef} />
+            </div>
+
+            {/* Input Form */}
+            <div className={`border-t p-4 ${darkMode ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-gray-50'}`}>
+                <form onSubmit={handleSubmit} className="space-y-3">
+                    <div className="flex gap-3">
+                        <div className="flex-1">
+                            <Textarea
+                                value={input}
+                                onChange={(e) => setInput(e.target.value)}
+                                placeholder={
+                                    chat?.workflow_state === 'awaiting_approval' 
+                                        ? "Request changes to the video plan..." 
+                                        : "Type your message..."
+                                }
+                                className={`min-h-[80px] resize-none ${darkMode ? 'bg-gray-700 border-gray-600 text-white' : 'bg-white border-gray-300'}`}
+                                disabled={isLoading}
+                            />
+                        </div>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <input
+                                type="file"
+                                ref={fileInputRef}
+                                onChange={handleFileSelect}
+                                accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/jpg,image/png,image/webp"
+                                className="hidden"
+                            />
+                            <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                onClick={() => fileInputRef.current?.click()}
+                                disabled={isLoading}
+                            >
+                                <Upload className="w-4 h-4" />
+                            </Button>
+                            
+                            {selectedFile && (
+                                <div className="flex items-center gap-2">
+                                    <span className="text-xs text-gray-600 dark:text-gray-400">
+                                        {selectedFile.name}
+                                    </span>
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => {
+                                            setSelectedFile(null);
+                                            if (fileInputRef.current) {
+                                                fileInputRef.current.value = '';
+                                            }
+                                        }}
+                                    >
+                                        <X className="w-3 h-3" />
+                                    </Button>
+                                </div>
+                            )}
+                        </div>
+
+                        <Button
+                            type="submit"
+                            disabled={isLoading || (!input.trim() && !selectedFile)}
+                            size="sm"
+                        >
+                            {isLoading ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                            ) : (
+                                <Send className="w-4 h-4" />
+                            )}
+                        </Button>
+                    </div>
+                </form>
+            </div>
+
+            {/* Credits Modal */}
+            <CreditsModal 
+                isOpen={showCreditsModal}
+                onClose={() => setShowCreditsModal(false)}
+                onCreditsAdded={() => {
+                    setShowCreditsModal(false);
+                    onCreditsRefreshed?.();
+                }}
+                darkMode={darkMode}
+            />
+        </div>
+    );
+}
