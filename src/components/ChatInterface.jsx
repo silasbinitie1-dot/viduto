@@ -3,8 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Send, Upload, X, Loader2, Play, Download, AlertCircle } from 'lucide-react';
 import { Chat, Message, User, Video } from '@/api/entities';
-import { UploadFile } from '@/api/integrations';
-import { InvokeLLM } from '@/api/integrations';
+import { UploadFile, InvokeLLM } from '@/api/integrations';
 import { rateLimiter } from '@/integrations/Core';
 import { startVideoProduction } from '@/functions/startVideoProduction';
 import { checkVideoStatus } from '@/functions/checkVideoStatus';
@@ -1102,7 +1101,7 @@ Each voiceover MUST be exactly 15 words using formula:
                 await Message.create({
                     chat_id: currentChatId,
                     message_type: 'system',
-                    content: '🔧 Preparing your video environment...\n\n✨ AI is creating your video. This will take about 6 minutes. Progress may appear to jump at first — that's normal.',
+                    content: "🔧 Preparing your video environment...\n\n✨ AI is creating your video. This will take about 6 minutes. Progress may appear to jump at first — that's normal.",
                     metadata: {
                         production_initiated: true,
                         estimate_minutes: 6,
