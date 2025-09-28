@@ -1,7 +1,7 @@
 
-
 import React, { useEffect } from 'react';
 import { Toaster } from "@/components/ui/sonner";
+import { toast } from "sonner"; // toast is no longer used in the new useEffect, but keeping import as it might be used elsewhere.
 
 export default function Layout({ children, currentPageName }) {
   useEffect(() => {
@@ -26,106 +26,6 @@ export default function Layout({ children, currentPageName }) {
     }
   }, [currentPageName]);
 
-  // Enforce JPG/PNG-only uploads globally
-  useEffect(() => {
-    const allowedMimes = new Set(["image/jpeg", "image/png"]);
-    const allowedExts = new Set(["jpg", "jpeg", "png"]);
-    const knownImageExts = new Set(["jpg","jpeg","png","webp","heic","heif","gif","bmp","tif","tiff"]);
-
-    const ensureAccept = (input) => {
-      if (!(input instanceof HTMLInputElement) || input.type !== "file") return;
-      const accept = input.getAttribute("accept");
-      // Only constrain inputs that are intended for images (accept missing or includes "image")
-      if (!accept || /image/i.test(accept)) {
-        input.setAttribute("accept", "image/png,image/jpeg");
-      }
-    };
-
-    const isImageFile = (file) => {
-      const type = String(file?.type || "").toLowerCase();
-      const name = String(file?.name || "").toLowerCase();
-      const ext = name.includes(".") ? name.split(".").pop() : "";
-      return type.startsWith("image/") || knownImageExts.has(ext);
-    };
-
-    const isAllowedImage = (file) => {
-      const type = String(file?.type || "").toLowerCase();
-      const name = String(file?.name || "").toLowerCase();
-      const ext = name.includes(".") ? name.split(".").pop() : "";
-      return allowedMimes.has(type) || allowedExts.has(ext);
-    };
-
-    const onChange = (e) => {
-      const target = e.target;
-      if (!(target instanceof HTMLInputElement) || target.type !== "file") return;
-      const files = target.files;
-      if (!files || files.length === 0) return;
-
-      // Only enforce if the chosen files are images
-      for (const f of files) {
-        if (!isImageFile(f)) continue; // Only process actual image files
-        if (!isAllowedImage(f)) {
-          console.error("Only JPG or PNG images are allowed.");
-          target.value = ""; // Clear the input value to prevent submission of invalid files
-          e.preventDefault();
-          e.stopPropagation();
-          return;
-        }
-      }
-    };
-
-    const onDrop = (e) => {
-      // Check if the event target is an element that accepts files, or if the drop contains files
-      const target = e.target;
-      const hasFiles = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0;
-
-      // If it's a file input, or a general drop event with files, proceed with validation
-      if ((target instanceof HTMLInputElement && target.type === "file") || hasFiles) {
-        const dt = e.dataTransfer;
-        if (!dt || !dt.files || dt.files.length === 0) return;
-
-        for (const f of dt.files) {
-          if (!isImageFile(f)) continue; // Only process actual image files
-          if (!isAllowedImage(f)) {
-            console.error("Only JPG or PNG images are allowed.");
-            e.preventDefault(); // Prevent file from being dropped
-            e.stopPropagation();
-            return;
-          }
-        }
-      }
-    };
-
-    // Use capture phase for events to ensure they are processed before other handlers
-    document.addEventListener("change", onChange, true);
-    document.addEventListener("drop", onDrop, true);
-    document.addEventListener("dragover", (e) => e.preventDefault(), true); // Needed to allow drop event
-
-    // Set accept attribute on existing file inputs
-    document.querySelectorAll('input[type="file"]').forEach(ensureAccept);
-
-    // Observe future additions and set accept accordingly
-    const mo = new MutationObserver((mutations) => {
-      for (const m of mutations) {
-        m.addedNodes.forEach((node) => {
-          if (!(node instanceof HTMLElement)) return;
-          // Check the node itself
-          if (node.matches?.('input[type="file"]')) ensureAccept(node);
-          // Check children of the node
-          node.querySelectorAll?.('input[type="file"]').forEach(ensureAccept);
-        });
-      }
-    });
-    mo.observe(document.body, { childList: true, subtree: true });
-
-    return () => {
-      document.removeEventListener("change", onChange, true);
-      document.removeEventListener("drop", onDrop, true);
-      document.removeEventListener("dragover", (e) => e.preventDefault(), true);
-      mo.disconnect();
-    };
-  }, []);
-
   // Dynamic SEO metadata per page
   const baseUrl = 'https://viduto.com';
   const metaMap = {
@@ -133,7 +33,7 @@ export default function Layout({ children, currentPageName }) {
       title: 'Viduto - Create viral videos with your product',
       description: 'Create viral video ads from your product images by simply chatting with AI. Transform your products into professional 30-second videos in about 10 minutes.',
       path: '/',
-      image: 'https://images.pexels.com/photos/3184465/pexels-photo-3184465.jpeg?auto=compress&cs=tinysrgb&w=800'
+      image: 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68b4aa46f5d6326ab93c3ed0/e690cf3a7_IMG_6930.jpg' // Updated image URL
     },
     features: {
       title: 'Features — Viduto: AI product videos in ~10 minutes',
@@ -194,7 +94,7 @@ export default function Layout({ children, currentPageName }) {
     "@type": "Organization",
     "name": "Viduto",
     "url": baseUrl,
-    "logo": `${baseUrl}/viduto logo transparent.png`
+    "logo": "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68b4aa46f5d6326ab93c3ed0/42beff144_vidutologotransparent.png"
   };
 
   const websiteJsonLd = {
@@ -255,9 +155,9 @@ export default function Layout({ children, currentPageName }) {
       `}</style>
       
       {/* Favicon */}
-      <link rel="icon" type="image/png" href="/viduto logo transparent.png" />
-      <link rel="shortcut icon" type="image/png" href="/viduto logo transparent.png" />
-      <link rel="apple-touch-icon" sizes="180x180" href="/viduto logo transparent.png" />
+      <link rel="icon" type="image/png" href="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68b4aa46f5d6326ab93c3ed0/42beff144_vidutologotransparent.png" />
+      <link rel="shortcut icon" type="image/png" href="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68b4aa46f5d6326ab93c3ed0/42beff144_vidutologotransparent.png" />
+      <link rel="apple-touch-icon" sizes="180x180" href="https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/68b4aa46f5d6326ab93c3ed0/42beff144_vidutologotransparent.png" />
       
       {/* Dynamic SEO meta */}
       <title>{current.title}</title>
@@ -289,4 +189,3 @@ export default function Layout({ children, currentPageName }) {
     </>
   );
 }
-
