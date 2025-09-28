@@ -343,14 +343,18 @@ export const getBlogPosts = async (data = {}) => {
 
 export const ensureUserCredits = async () => {
   try {
+    console.log('🔍 ensureUserCredits - Starting...');
     // Get the current user's session token
     const { data: { session }, error: sessionError } = await supabase.auth.getSession()
     
     if (sessionError || !session?.access_token) {
+      console.error('❌ ensureUserCredits - No session:', sessionError?.message);
       throw new Error('Not authenticated - please log in again')
     }
+    console.log('✅ ensureUserCredits - Session found');
 
     const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/ensure-user-credits`
+    console.log('🔗 ensureUserCredits - API URL:', apiUrl);
     
     const headers = {
       'Authorization': `Bearer ${session.access_token}`,
@@ -362,10 +366,13 @@ export const ensureUserCredits = async () => {
       headers,
       body: JSON.stringify({})
     })
+    
+    console.log('📡 ensureUserCredits - Response status:', response.status);
 
     if (!response.ok) {
       const errorText = await response.text()
       console.error('Ensure Credits API Error Response:', errorText)
+      console.error('❌ ensureUserCredits - API call failed:', response.status, errorText);
       let errorData
       try {
         errorData = JSON.parse(errorText)
@@ -376,9 +383,11 @@ export const ensureUserCredits = async () => {
     }
 
     const result = await response.json()
+    console.log('✅ ensureUserCredits - Success:', result.message);
     return result
   } catch (error) {
     console.error('Error ensuring user credits:', error)
+    console.error('❌ ensureUserCredits - Final error:', error.message);
     throw error
   }
 }
@@ -427,14 +436,18 @@ export const setupNewUser = async () => {
 
 export const syncUserWithStripe = async () => {
   try {
+    console.log('🔍 syncUserWithStripe - Starting sync...');
     // Get the current user's session token
     const { data: { session }, error: sessionError } = await supabase.auth.getSession()
     
     if (sessionError || !session?.access_token) {
+      console.error('❌ syncUserWithStripe - No session:', sessionError?.message);
       throw new Error('Not authenticated - please log in again')
     }
+    console.log('✅ syncUserWithStripe - Session found');
 
     const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-user-stripe`
+    console.log('🔗 syncUserWithStripe - API URL:', apiUrl);
     
     const headers = {
       'Authorization': `Bearer ${session.access_token}`,
@@ -446,10 +459,13 @@ export const syncUserWithStripe = async () => {
       headers,
       body: JSON.stringify({})
     })
+    
+    console.log('📡 syncUserWithStripe - Response status:', response.status);
 
     if (!response.ok) {
       const errorText = await response.text()
       console.error('Sync Stripe API Error Response:', errorText)
+      console.error('❌ syncUserWithStripe - API call failed:', response.status, errorText);
       let errorData
       try {
         errorData = JSON.parse(errorText)
@@ -460,9 +476,11 @@ export const syncUserWithStripe = async () => {
     }
 
     const result = await response.json()
+    console.log('✅ syncUserWithStripe - Success:', result.message);
     return result
   } catch (error) {
     console.error('Error syncing with Stripe:', error)
+    console.error('❌ syncUserWithStripe - Final error:', error.message);
     throw error
   }
 }

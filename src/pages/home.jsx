@@ -155,12 +155,18 @@ export default function Home() {
       return;
     }
 
+    console.log('🔍 Home - handleSubmit called');
+    console.log('User status:', user ? 'Logged in' : 'Not logged in');
+    console.log('Prompt length:', prompt.trim().length);
+    console.log('File selected:', selectedFile ? selectedFile.name : 'None');
+
     // Track Lead event for video creation intent
     if (window.fbq) {
       window.fbq('track', 'Lead', {
         content_name: 'Video Creation Intent',
         content_category: 'video_generation'
       });
+      console.log('✅ Home - Facebook Lead event tracked');
     }
 
     setIsSubmitting(true);
@@ -168,7 +174,9 @@ export default function Home() {
     try {
       if (!user) {
         console.log('User not logged in, storing pending data and showing auth modal');
+        console.log('🔍 Home - User not logged in, preparing pending data...');
         const fileBase64String = await fileToBase64(selectedFile);
+        console.log('✅ Home - File converted to base64');
 
         const pendingData = {
           prompt: prompt.trim(),
@@ -185,11 +193,20 @@ export default function Home() {
           fileName: pendingData.fileName,
           fileSize: pendingData.fileSize
         });
+        console.log('✅ Home - Pending data prepared:', {
+          promptLength: pendingData.prompt.length,
+          fileName: pendingData.fileName,
+          fileSize: pendingData.fileSize,
+          timestamp: pendingData.timestamp
+        });
         
         sessionStorage.setItem('pendingChatData', JSON.stringify(pendingData));
+        console.log('✅ Home - Pending data stored in sessionStorage');
         setShowAuthModal(true);
+        console.log('✅ Home - Auth modal opened');
       } else {
         console.log('User logged in, creating chat directly');
+        console.log('🔍 Home - User logged in, creating chat directly...');
         const { Chat, Message } = await import('@/api/entities');
         const { Core } = await import('@/api/integrations');
 
@@ -197,8 +214,10 @@ export default function Home() {
           title: prompt.trim().length > 50 ? prompt.trim().substring(0, 50) + '...' : prompt.trim(),
           workflow_state: 'draft'
         });
+        console.log('✅ Home - New chat created:', newChat.id);
 
         const { file_url } = await Core.UploadFile({ file: selectedFile });
+        console.log('✅ Home - File uploaded:', file_url);
 
         await Message.create({
           chat_id: newChat.id,
@@ -206,24 +225,33 @@ export default function Home() {
           content: prompt.trim(),
           metadata: { image_url: file_url, is_initial_request: true }
         });
+        console.log('✅ Home - Initial message created');
 
         sessionStorage.removeItem('pendingChatData');
         console.log('Navigating to dashboard with chat:', newChat.id);
+        console.log('🔍 Home - Navigating to dashboard...');
         navigate(`/dashboard?chat=${newChat.id}`);
       }
     } catch (error) {
       console.error('Error submitting:', error);
+      console.error('❌ Home - Submit error:', error.message);
+      console.error('❌ Home - Submit error details:', error);
       toast.error('Failed to create video request. Please try again.');
       sessionStorage.removeItem('pendingChatData');
     } finally {
       setIsSubmitting(false);
+      console.log('🏁 Home - Submit process completed');
     }
   };
 
   const handleAuthRequired = () => {
+    console.log('🔍 Home - handleAuthRequired called');
+    console.log('User status:', user ? 'Logged in' : 'Not logged in');
     if (!user) {
+      console.log('✅ Home - Opening auth modal');
       setShowAuthModal(true);
     } else {
+      console.log('✅ Home - Navigating to dashboard');
       navigate('/dashboard');
     }
   };

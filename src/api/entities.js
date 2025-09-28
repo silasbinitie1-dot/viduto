@@ -162,16 +162,20 @@ export const Video = {
 
 export const User = {
   me: async () => {
+    console.log('🔍 User.me() called');
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     
     if (authError || !user) {
       console.log('User.me - Auth check failed:', authError?.message || 'No user')
+      console.error('❌ User.me - Authentication failed:', authError?.message || 'No user session');
       throw new Error(`Not authenticated: ${authError?.message || 'No user session'}`)
     }
 
     console.log('User.me - Auth successful for:', user.email)
+    console.log('✅ User.me - Authentication successful for:', user.email);
 
     // Get user profile from users table
+    console.log('🔍 User.me - Fetching user profile from database...');
     const { data: profile, error: profileError } = await supabase
       .from('users')
       .select('*')
@@ -181,12 +185,15 @@ export const User = {
     if (profileError) {
       // If profile doesn't exist, try to create it
       console.log('User.me - Profile not found, creating new profile for:', user.email);
+      console.log('⚠️ User.me - Profile not found, attempting to create new profile...');
       
       // Call setup-new-user function to ensure proper initialization
       try {
+        console.log('🔍 User.me - Calling setup-new-user function...');
         const { data: { session } } = await supabase.auth.getSession()
         if (session?.access_token) {
           const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/setup-new-user`
+          console.log('🔗 User.me - API URL:', apiUrl);
           
           const response = await fetch(apiUrl, {
             method: 'POST',
@@ -197,19 +204,26 @@ export const User = {
             body: JSON.stringify({})
           })
           
+          console.log('📡 User.me - Setup function response status:', response.status);
+          const responseText = await response.text();
+          console.log('📡 User.me - Setup function response:', responseText);
+          
           if (response.ok) {
-            const result = await response.json()
+            const result = JSON.parse(responseText);
             if (result.success && result.user) {
               console.log('User.me - Profile created via setup-new-user function');
+              console.log('✅ User.me - Profile created successfully via setup function');
               return result.user
             }
           }
         }
       } catch (setupError) {
         console.warn('User.me - Setup function failed, falling back to direct creation:', setupError.message);
+        console.error('❌ User.me - Setup function failed:', setupError.message);
       }
       
       // Fallback: direct profile creation
+      console.log('🔍 User.me - Attempting direct profile creation...');
       const { data: newProfile, error: createError } = await supabase
         .from('users')
         .insert({
@@ -225,14 +239,23 @@ export const User = {
       
       if (createError) {
         console.error('User.me - Failed to create profile:', createError.message);
+        console.error('❌ User.me - Direct profile creation failed:', createError.message);
+        console.error('❌ User.me - Create error details:', createError);
         throw new Error('Failed to create user profile. Please contact support.');
       }
       
       console.log('User.me - Profile created successfully for:', user.email)
+      console.log('✅ User.me - Direct profile creation successful');
       return newProfile
     }
 
     console.log('User.me - Profile found:', profile.email, 'Credits:', profile.credits)
+    console.log('✅ User.me - Profile found successfully:', {
+      email: profile.email,
+      credits: profile.credits,
+      plan: profile.current_plan,
+      subscription_status: profile.subscription_status
+    });
     return profile
   },
 

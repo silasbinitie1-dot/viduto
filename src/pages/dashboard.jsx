@@ -151,8 +151,10 @@ export default function Dashboard() {
 
   useEffect(() => {
     const initialize = async () => {
+      console.log('🚀 Dashboard initialization started at:', new Date().toISOString());
       setLoading(true);
       try {
+        console.log('🔍 Step 1: Checking session...');
         // Wait for auth state to be ready and check session
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
         
@@ -164,44 +166,71 @@ export default function Dashboard() {
         
         if (!session) {
           console.log('No session found, redirecting to home');
+          console.log('❌ No session - redirecting to home');
           navigate('/home');
           return;
         }
+        console.log('✅ Session found for user:', session.user.email);
         
+        console.log('🔍 Step 2: Syncing with Stripe...');
         // Sync with Stripe first to ensure user data is up to date
-        await syncUserWithStripe();
+        try {
+          await syncUserWithStripe();
+          console.log('✅ Stripe sync completed successfully');
+        } catch (stripeError) {
+          console.warn('⚠️ Stripe sync failed, continuing anyway:', stripeError.message);
+        }
 
+        console.log('🔍 Step 3: Loading user profile...');
         const currentUser = await User.me();
         console.log('Dashboard initialization - User loaded:', {
           email: currentUser.email,
           credits: currentUser.credits,
           plan: currentUser.current_plan
         });
+        console.log('✅ User profile loaded successfully');
         
         setUser(currentUser);
         setUserCredits(currentUser.credits || 0);
         setAuthError(false);
 
+        console.log('🔍 Step 4: Ensuring user credits...');
         // This ensures new users or users with 0 credits get their initial credits if applicable
         if (!currentUser.credits || currentUser.credits === 0) {
-          await ensureCredits();
+          try {
+            await ensureCredits();
+            console.log('✅ Credits ensured successfully');
+          } catch (creditsError) {
+            console.warn('⚠️ Credits ensure failed:', creditsError.message);
+          }
         }
 
+        console.log('🔍 Step 5: Tracking analytics...');
         // Track successful dashboard access
         if (window.fbq) {
           window.fbq('track', 'CompleteRegistration');
+          console.log('✅ Facebook analytics tracked');
         }
         
+        console.log('🔍 Step 6: Processing URL parameters...');
         const urlParams = new URLSearchParams(window.location.search);
+        
+        // Handle auth success parameter
+        if (urlParams.get('auth') === 'success') {
+          console.log('✅ OAuth redirect detected - auth successful');
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
         
         const view = urlParams.get('view');
         if (view === 'pricing') {
           setActiveDashboardView('pricing');
+          console.log('✅ Set view to pricing from URL');
         }
 
         // Handle successful payment redirect
         if (urlParams.get('success') === 'true') {
             toast.success("Payment successful! Your subscription is being updated...");
+            console.log('✅ Processing successful payment redirect');
             if (window.fbq) {
                 window.fbq('track', 'Purchase', { value: 0.01, currency: 'USD' });
             }
@@ -229,10 +258,12 @@ export default function Dashboard() {
             window.history.replaceState({}, document.title, "/dashboard");
         }
 
+        console.log('🔍 Step 7: Processing chat data...');
         // Handle chat ID from URL or pending data
         const chatIdFromUrl = urlParams.get('chat');
 
         if (chatIdFromUrl) {
+          console.log('✅ Processing chat ID from URL:', chatIdFromUrl);
           const userChats = await Chat.filter({ created_by: currentUser.email }, '-updated_date');
           setChats(userChats || []);
           setCurrentChatId(chatIdFromUrl);
@@ -242,6 +273,7 @@ export default function Dashboard() {
            const pendingDataStr = sessionStorage.getItem('pendingChatData');
            if (pendingDataStr) {
               console.log('Processing pending chat data from sessionStorage');
+              console.log('✅ Found pending chat data, processing...');
               const pendingData = JSON.parse(pendingDataStr);
               sessionStorage.removeItem('pendingChatData');
               
@@ -250,6 +282,7 @@ export default function Dashboard() {
                     title: pendingData.prompt.length > 50 ? pendingData.prompt.substring(0, 50) + '...' : pendingData.prompt, 
                     workflow_state: 'draft' 
                 });
+                console.log('✅ Created new chat from pending data:', newChat.id);
                 
                 // Reconstruct file from base64
                 const byteCharacters = atob(pendingData.fileBase64.split(',')[1]);
@@ -261,6 +294,7 @@ export default function Dashboard() {
                 const file = new File([byteArray], pendingData.fileName, { type: pendingData.fileType });
 
                 const { file_url } = await UploadFile({ file });
+                console.log('✅ Uploaded file from pending data:', file_url);
                 
                 await Message.create({
                   chat_id: newChat.id,
@@ -268,6 +302,7 @@ export default function Dashboard() {
                   content: pendingData.prompt,
                   metadata: { image_url: file_url, is_initial_request: true }
                 });
+                console.log('✅ Created initial message from pending data');
 
                 const userChats = await Chat.filter({ created_by: currentUser.email }, '-updated_date');
                 setChats(userChats || []);
@@ -276,6 +311,7 @@ export default function Dashboard() {
                 console.log('Successfully processed pending chat data');
               } catch (error) {
                 console.error('Error processing pending chat data:', error);
+                console.error('❌ Failed to process pending chat data:', error.message);
                 toast.error('Failed to process your video request. Please try again.');
                 
                 // Load regular chats as fallback
@@ -287,21 +323,30 @@ export default function Dashboard() {
               }
               
            } else {
+              console.log('🔍 No pending data, loading existing chats...');
               // Load existing chats
               const userChats = await Chat.filter({ created_by: currentUser.email }, '-updated_date');
               setChats(userChats || []);
               if (userChats && userChats.length > 0) {
                 setCurrentChatId(userChats[0].id);
+                console.log('✅ Loaded existing chats, selected:', userChats[0].id);
               }
            }
         }
+        
+        console.log('🎉 Dashboard initialization completed successfully!');
       } catch (e) {
         console.error('Initialization failed:', e);
+        console.error('❌ DASHBOARD INITIALIZATION FAILED:');
+        console.error('Error message:', e.message);
+        console.error('Error stack:', e.stack);
+        console.error('Error details:', e);
         setAuthError(true);
         toast.error('Failed to load dashboard. Redirecting to home...');
         setTimeout(() => navigate('/home'), 2000);
       } finally {
         setLoading(false);
+        console.log('🏁 Dashboard loading state set to false');
       }
     };
     

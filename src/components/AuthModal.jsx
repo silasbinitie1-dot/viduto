@@ -14,16 +14,20 @@ export const AuthModal = ({ isOpen, onClose }) => {
         setIsLoading(true);
         
         try {
+            console.log('🔍 AuthModal - Starting Google login...');
             // Track login attempt
             if (window.fbq) {
                 window.fbq('track', 'InitiateCheckout');
+                console.log('✅ AuthModal - Facebook analytics tracked');
             }
             
+            console.log('🔍 AuthModal - Calling Supabase OAuth...');
+            console.log('🔗 AuthModal - Redirect URL will be:', `${window.location.origin}/dashboard`);
             // Use Supabase Google OAuth login
             const { error } = await supabase.auth.signInWithOAuth({
                 provider: 'google',
                 options: {
-                    redirectTo: `${window.location.origin}/dashboard`,
+                    redirectTo: `${window.location.origin}/dashboard?auth=success`,
                     queryParams: {
                         access_type: 'offline',
                         prompt: 'consent',
@@ -32,15 +36,18 @@ export const AuthModal = ({ isOpen, onClose }) => {
             });
             
             if (error) {
+                console.error('❌ AuthModal - OAuth error:', error.message);
                 throw error;
             }
             
+            console.log('✅ AuthModal - OAuth initiated successfully');
             // Close modal after initiating OAuth
             onClose();
             
             // The redirect will happen automatically after successful authentication
         } catch (error) {
             console.error('Google login failed:', error);
+            console.error('❌ AuthModal - Login failed:', error.message);
             toast.error('Login failed. Please try again.');
             setIsLoading(false);
         }
