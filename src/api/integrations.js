@@ -20,7 +20,6 @@ If user requests these, respond: "This product type may not work optimally with 
 
 UNSUITABLE PRODUCTS:
 - Software, apps, digital services (no physical form)
-- Very small items (pills, jewelry under 1cm, tiny accessories)
 - Transparent/clear products without distinctive features
 - Text-heavy products (books, documents, signs)
 - Products requiring human demonstration (fitness equipment, tools)
