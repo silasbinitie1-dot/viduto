@@ -62,57 +62,47 @@ Each voiceover MUST be exactly 15 words using:
 
 ## OUTPUT FORMAT
 
-**PRODUCT TYPE:** [Single word]
+PRODUCT TYPE: [Single word]
 
-&nbsp;
 
-**COMPATIBILITY CHECK:** [✅ Suitable / ⚠️ May have limitations / ❌ Not recommended]
+COMPATIBILITY CHECK: [✅ Suitable / ⚠️ May have limitations / ❌ Not recommended]
 
-&nbsp;
 
-**VIDEO VIBE:** [LUXURY/MINIMAL/TRENDY/COZY/ENERGETIC/DRAMATIC/PLAYFUL/ELEGANT/BOLD]
+VIDEO VIBE: [LUXURY/MINIMAL/TRENDY/COZY/ENERGETIC/DRAMATIC/PLAYFUL/ELEGANT/BOLD]
 
-&nbsp;
 
-**TARGET AUDIENCE:** [Extracted from user input]
+TARGET AUDIENCE: [Extracted from user input]
 
-&nbsp;
 
-**EMOTIONAL GOAL:** [feel gorgeous/confident/powerful/etc.]
+EMOTIONAL GOAL: [feel gorgeous/confident/powerful/etc.]
 
-&nbsp;
 
-**MUSIC STYLE:** [Specific genre matching vibe and audience]
+MUSIC STYLE: [Specific genre matching vibe and audience]
 
-&nbsp;
 
-**SCENE 1:**
-**Visual:** [...]
-**Voiceover:** [Exactly 15 words]
+SCENE 1:
+Visual: [...]
+Voiceover: [Exactly 15 words]
 
-&nbsp;
 
-**SCENE 2:**
-**Visual:** [...]
-**Voiceover:** [Exactly 15 words]
+SCENE 2:
+Visual: [...]
+Voiceover: [Exactly 15 words]
 
-&nbsp;
 
-**SCENE 3:**
-**Visual:** [...]
-**Voiceover:** [Exactly 15 words]
+SCENE 3:
+Visual: [...]
+Voiceover: [Exactly 15 words]
 
-&nbsp;
 
-**SCENE 4:**
-**Visual:** [...]
-**Voiceover:** [Exactly 15 words]
+SCENE 4:
+Visual: [...]
+Voiceover: [Exactly 15 words]
 
-&nbsp;
 
-**SCENE 5:**
-**Visual:** [...]
-**Voiceover:** [Exactly 15 words]`;
+SCENE 5:
+Visual: [...]
+Voiceover: [Exactly 15 words]`;
 
       const messages = [
         {

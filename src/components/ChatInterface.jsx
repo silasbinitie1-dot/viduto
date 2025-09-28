@@ -136,7 +136,7 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
      const approvalMessage = await Message.create({
        chat_id: chat.id,
        message_type: 'system',
-       content: 'Please carefully read the Video Plan before you generate the video, check if it fits your vision and request changes if it doesn\'t until it feels perfect!\n\n✅ Ready to Create?',
+        content: 'approval_instruction',
        metadata: { 
          is_approval_instruction: true,
          created_at: new Date().toISOString()
@@ -724,69 +724,23 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
                     <div className={`max-w-[90%] rounded-2xl p-6 ${
                       darkMode ? 'bg-gray-800 border border-gray-700' : 'bg-blue-50 border border-blue-200'
                     }`}>
-                      <div className="flex items-center justify-between mb-4">
+                      <div className="mb-4">
                         <h3 className={`text-lg font-normal ${darkMode ? 'text-white' : 'text-gray-900'}`}>
                           📋 Video Plan
                         </h3>
-                        {!editingBrief && (
-                          <div className="flex gap-2">
-                            <Button
-                              onClick={handleEditBrief}
-                              variant="outline"
-                              size="sm"
-                              className={`gap-2 ${darkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : ''}`}
-                            >
-                              <Edit3 className="w-4 h-4" />
-                              Edit
-                            </Button>
-                          </div>
-                        )}
                       </div>
 
-                      {editingBrief ? (
-                        <div className="space-y-4">
-                          <textarea
-                            value={briefText}
-                            onChange={(e) => setBriefText(e.target.value)}
-                            className={`w-full h-64 p-4 rounded-lg border resize-none focus:outline-none focus:ring-2 focus:ring-orange-500 ${
-                              darkMode 
-                                ? 'bg-gray-700 border-gray-600 text-white' 
-                                : 'bg-white border-gray-300 text-gray-900'
-                            }`}
-                          />
-                          <div className="flex gap-2">
-                            <Button
-                              onClick={handleSaveBrief}
-                              className="bg-orange-500 text-white hover:bg-orange-600"
-                            >
-                              <Check className="w-4 h-4 mr-2" />
-                              Save Changes
-                            </Button>
-                            <Button
-                              onClick={() => {
-                                setEditingBrief(false);
-                                setBriefText(currentBrief || '');
-                              }}
-                              variant="outline"
-                              className={darkMode ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : ''}
-                            >
-                              Cancel
-                            </Button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="space-y-4">
-                          <div className={`prose prose-sm max-w-none ${
-                            darkMode ? 'prose-invert' : ''
+                      <div className="space-y-4">
+                        <div className={`prose prose-sm max-w-none ${
+                          darkMode ? 'prose-invert' : ''
+                        }`}>
+                          <div className={`whitespace-pre-wrap font-light leading-relaxed ${
+                            darkMode ? 'text-gray-300' : 'text-gray-700'
                           }`}>
-                            <div className={`whitespace-pre-wrap font-light leading-relaxed ${
-                              darkMode ? 'text-gray-300' : 'text-gray-700'
-                            }`}>
-                              {currentBrief || message.content}
-                            </div>
+                            {currentBrief || message.content}
                           </div>
                         </div>
-                      )}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -797,12 +751,12 @@ export function ChatInterface({ chatId, onChatUpdate, onCreditsRefreshed, onNewC
                     <div className={`max-w-[80%] rounded-2xl p-6 text-center ${
                       darkMode ? 'bg-green-900/20 border border-green-700' : 'bg-green-50 border border-green-200'
                     }`}>
-                      <div className={`prose prose-sm max-w-none ${darkMode ? 'prose-invert' : ''}`}>
-                        <div className={`font-medium leading-relaxed ${
-                          darkMode ? 'text-green-300' : 'text-green-700'
-                        }`}>
-                          {message.content}
-                        </div>
+                      <div className={`font-medium leading-relaxed mb-4 ${
+                        darkMode ? 'text-green-300' : 'text-green-700'
+                      }`}>
+                        <strong>Please carefully read the Video Plan before you generate the video, check if it fits your vision and request changes if it doesn't until it feels perfect!</strong>
+                        <br /><br />
+                        ✅ Ready to Create?
                       </div>
                       
                       {currentChat?.workflow_state === 'awaiting_approval' && (
