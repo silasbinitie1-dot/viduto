@@ -100,10 +100,6 @@ export function PricingContent({ isSubscriptionView = false, darkMode = false, u
         return;
     }
     
-    // Removed Facebook Conversion Event logic and related plan lookup as per outline.
-    // The previous logic for direct upgrade (response.upgraded) has been removed,
-    // assuming all upgrades will now involve a redirect to Stripe Checkout.
-
     setLoading(prev => ({ ...prev, [priceId]: true }));
     
     try {
@@ -112,18 +108,28 @@ export function PricingContent({ isSubscriptionView = false, darkMode = false, u
             mode: 'subscription'
         });
 
-        if (response.url) {
+        if (response.data?.upgraded) {
+            // Direct upgrade with prorated credits
+            toast({
+              title: "Plan Upgraded!",
+              description: response.data.message,
+              variant: "default",
+            });
+            
+            // Refresh user data
+            setTimeout(() => {
+              window.location.reload();
+            }, 1500);
+        } else if (response.data?.url) {
             // Redirect to Stripe Checkout
-            window.location.href = response.url;
+            window.location.href = response.data.url;
         } else {
-            // Updated error message to match outline's simplified expectation
             throw new Error('No checkout URL received from server');
         }
 
     } catch (error) {
         console.error('Upgrade error:', error);
         
-        // Ensure error messages are always in English and use existing toast mechanism
         const errorMessage = error.message || 'Failed to create checkout session. Please try again.';
         
         toast({

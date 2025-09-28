@@ -2,21 +2,86 @@
 import { supabase } from '@/lib/supabase'
 
 export const createStripeCheckoutSession = async (data) => {
-  // Mock Stripe checkout - in production this would create actual Stripe sessions
-  console.log('Mock Stripe checkout session:', data)
-  return {
-    data: {
-      url: 'https://checkout.stripe.com/mock-session'
+  try {
+    // Get the current user's session token
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    
+    if (sessionError || !session?.access_token) {
+      throw new Error('Not authenticated - please log in again')
     }
+
+    const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-stripe-checkout`
+    
+    const headers = {
+      'Authorization': `Bearer ${session.access_token}`,
+      'Content-Type': 'application/json',
+    }
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(data)
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('Stripe Checkout API Error Response:', errorText)
+      let errorData
+      try {
+        errorData = JSON.parse(errorText)
+      } catch {
+        errorData = { error: errorText }
+      }
+      throw new Error(errorData.error || 'Failed to create checkout session')
+    }
+
+    const result = await response.json()
+    return result
+  } catch (error) {
+    console.error('Error creating Stripe checkout session:', error)
+    throw error
   }
 }
 
 export const createStripeCustomerPortal = async () => {
-  // Mock customer portal
-  return {
-    data: {
-      url: 'https://billing.stripe.com/mock-portal'
+  try {
+    // Get the current user's session token
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    
+    if (sessionError || !session?.access_token) {
+      throw new Error('Not authenticated - please log in again')
     }
+
+    const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-stripe-portal`
+    
+    const headers = {
+      'Authorization': `Bearer ${session.access_token}`,
+      'Content-Type': 'application/json',
+    }
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({})
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('Stripe Portal API Error Response:', errorText)
+      let errorData
+      try {
+        errorData = JSON.parse(errorText)
+      } catch {
+        errorData = { error: errorText }
+      }
+      throw new Error(errorData.error || 'Failed to create customer portal')
+    }
+
+    const result = await response.json()
+    return result
+  } catch (error) {
+    console.error('Error creating Stripe customer portal:', error)
+    throw error
   }
 }
 
@@ -294,8 +359,45 @@ export const setupNewUser = async () => {
 }
 
 export const syncUserWithStripe = async () => {
-  // Mock Stripe sync
-  return { success: true }
+  try {
+    // Get the current user's session token
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+    
+    if (sessionError || !session?.access_token) {
+      throw new Error('Not authenticated - please log in again')
+    }
+
+    const apiUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/sync-user-stripe`
+    
+    const headers = {
+      'Authorization': `Bearer ${session.access_token}`,
+      'Content-Type': 'application/json',
+    }
+
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({})
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('Sync Stripe API Error Response:', errorText)
+      let errorData
+      try {
+        errorData = JSON.parse(errorText)
+      } catch {
+        errorData = { error: errorText }
+      }
+      throw new Error(errorData.error || 'Failed to sync with Stripe')
+    }
+
+    const result = await response.json()
+    return result
+  } catch (error) {
+    console.error('Error syncing with Stripe:', error)
+    throw error
+  }
 }
 
 export const stripeWebhook = async (data) => {
